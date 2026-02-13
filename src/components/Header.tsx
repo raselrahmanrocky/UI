@@ -9,13 +9,22 @@ interface HeaderProps {
   setDocumentState: (state: DocumentState) => void;
   onFileUpload: (file: File) => void;
   onToggleSidebar?: () => void;
+  currentFile: File | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({ uiTheme, setUiTheme, documentState, setDocumentState, onFileUpload, onToggleSidebar }) => {
+export const Header: React.FC<HeaderProps> = ({
+  uiTheme,
+  setUiTheme,
+  documentState,
+  setDocumentState,
+  onFileUpload,
+  onToggleSidebar,
+  currentFile
+}) => {
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [showThemeSubmenu, setShowThemeSubmenu] = useState(false);
-  
+
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,12 +80,26 @@ export const Header: React.FC<HeaderProps> = ({ uiTheme, setUiTheme, documentSta
       event.target.value = '';
     }
   };
+  const handleDownload = () => {
+    if (currentFile) {
+      const url = URL.createObjectURL(currentFile);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = currentFile.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      alert("No document loaded to download.");
+    }
+  };
 
   return (
     <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151b2b] flex items-center justify-between px-4 shrink-0 z-20 transition-all duration-300 ease-in-out">
       <div className="flex items-center gap-4 md:gap-6">
         {/* Mobile Sidebar Toggle */}
-        <button 
+        <button
           className="md:hidden p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
           onClick={onToggleSidebar}
         >
@@ -123,31 +146,31 @@ export const Header: React.FC<HeaderProps> = ({ uiTheme, setUiTheme, documentSta
 
         {/* UI Theme Switcher (Light/Dark Mode) */}
         <div className="relative" ref={themeMenuRef}>
-          <button 
+          <button
             className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-all duration-200 flex items-center hover:scale-110"
             onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
             title="Interface Theme"
           >
             <span className="material-icons-outlined text-xl">{getThemeIcon(uiTheme)}</span>
           </button>
-          
+
           {isThemeMenuOpen && (
             <div className="absolute top-full right-0 mt-1 w-36 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg py-1 z-50 animate-fadeIn transition-all duration-200 origin-top-right">
-              <button 
+              <button
                 className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 ${uiTheme === 'light' ? 'text-primary font-medium' : 'text-slate-700 dark:text-slate-300'}`}
                 onClick={() => { setUiTheme('light'); setIsThemeMenuOpen(false); }}
               >
                 <span className="material-icons-outlined text-sm">light_mode</span>
                 Light
               </button>
-              <button 
+              <button
                 className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 ${uiTheme === 'dark' ? 'text-primary font-medium' : 'text-slate-700 dark:text-slate-300'}`}
                 onClick={() => { setUiTheme('dark'); setIsThemeMenuOpen(false); }}
               >
                 <span className="material-icons-outlined text-sm">dark_mode</span>
                 Dark
               </button>
-              <button 
+              <button
                 className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-150 ${uiTheme === 'system' ? 'text-primary font-medium' : 'text-slate-700 dark:text-slate-300'}`}
                 onClick={() => { setUiTheme('system'); setIsThemeMenuOpen(false); }}
               >
@@ -174,15 +197,18 @@ export const Header: React.FC<HeaderProps> = ({ uiTheme, setUiTheme, documentSta
             <span className="material-icons-outlined text-sm">redo</span>
           </button>
         </div>
-        
-        <button className="bg-primary hover:bg-blue-600 text-white px-3 py-1.5 md:px-4 rounded text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95">
-          <span className="material-icons-outlined text-sm">save</span>
-          <span className="hidden sm:inline">Save</span>
+
+        <button
+          onClick={handleDownload}
+          className="bg-primary hover:bg-blue-600 text-white px-3 py-1.5 md:px-4 rounded text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95"
+        >
+          <span className="material-icons-outlined text-sm">download</span>
+          <span className="hidden sm:inline">Download</span>
         </button>
 
         {/* Profile Dropdown */}
         <div className="relative" ref={profileMenuRef}>
-          <div 
+          <div
             className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden ml-2 border border-slate-700 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all duration-200 hover:scale-105"
             onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
           >
@@ -213,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({ uiTheme, setUiTheme, documentSta
 
               {/* Theme Submenu Trigger */}
               <div className="relative">
-                <button 
+                <button
                   className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-between group transition-colors duration-150"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -240,12 +266,12 @@ export const Header: React.FC<HeaderProps> = ({ uiTheme, setUiTheme, documentSta
                       >
                         <span>{name}</span>
                         <div className="flex gap-1">
-                          <div 
+                          <div
                             className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 transition-colors duration-300"
                             style={{ backgroundColor: preset.appBackground }}
                             title="Background"
                           />
-                          <div 
+                          <div
                             className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 transition-colors duration-300"
                             style={{ backgroundColor: preset.paperColor }}
                             title="Paper"

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { DocumentState } from '../types';
 import { renderAsync } from 'docx-preview';
 import JSZip from 'jszip';
+import { convertXmlDocument } from '../convert/bijoytounicode';
+import { convertXmlDocumentToBijoy } from '../convert/unicodetobijoy';
 
 interface EditorProps {
   state: DocumentState;
@@ -196,27 +198,94 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
     setIsDragging(false);
   };
 
+  const handleBatchConvert = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setIsRendering(true);
+    setRenderError(null);
+
+    try {
+      const processedFiles: File[] = [];
+
+      for (const file of files) {
+        const zip = new JSZip();
+        const content = await zip.loadAsync(file);
+        
+        // Find all XML files that might contain text
+        const xmlFiles = Object.keys(content.files).filter(path => 
+          path.startsWith('word/') && path.endsWith('.xml')
+        );
+
+        for (const path of xmlFiles) {
+          const xmlFile = content.file(path);
+          if (xmlFile) {
+            const xmlText = await xmlFile.async('string');
+            let convertedXml: string;
+
+            if (conversionType === 'legacyToUnicode') {
+              const isStyleFile = path.includes('styles.xml');
+              convertedXml = convertXmlDocument(xmlText, isStyleFile, forceConvert);
+            } else {
+              convertedXml = convertXmlDocumentToBijoy(xmlText);
+            }
+
+            zip.file(path, convertedXml);
+          }
+        }
+
+        const convertedBlob = await zip.generateAsync({ type: 'blob' });
+        const convertedFile = new File([convertedBlob], file.name, { type: file.type });
+        processedFiles.push(convertedFile);
+      }
+
+      if (processedFiles.length === 1) {
+        // Single file: trigger preview
+        if (onFileUpload) {
+          onFileUpload(processedFiles[0]);
+        }
+      } else {
+        // Multiple files: trigger batch download
+        for (const file of processedFiles) {
+          const url = URL.createObjectURL(file);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `converted_${file.name}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+        setIsRendering(false);
+      }
+    } catch (err) {
+      console.error("Conversion error:", err);
+      setRenderError("Failed to convert document(s).");
+      setIsRendering(false);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0 && onFileUpload) {
-      const file = droppedFiles[0];
-      if (file.name.endsWith('.docx')) {
-        onFileUpload(file);
-      } else {
-        alert('Please drop a valid .docx file.');
-      }
+    const docxFiles = droppedFiles.filter(f => f.name.endsWith('.docx'));
+    
+    if (docxFiles.length > 0) {
+      handleBatchConvert(docxFiles);
+    } else if (droppedFiles.length > 0) {
+      alert('Please drop valid .docx files.');
     }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0 && onFileUpload) {
-      const file = e.target.files[0];
-      if (file.name.endsWith('.docx')) {
-        onFileUpload(file);
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      const docxFiles = selectedFiles.filter(f => f.name.endsWith('.docx'));
+      
+      if (docxFiles.length > 0) {
+        handleBatchConvert(docxFiles);
       } else {
-        alert('Please select a valid .docx file.');
+        alert('Please select valid .docx files.');
       }
     }
     // Reset input

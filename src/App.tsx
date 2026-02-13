@@ -21,7 +21,7 @@ const App: React.FC = () => {
     const root = window.document.documentElement;
     const applyTheme = (theme: UITheme) => {
       root.classList.remove('light', 'dark');
-      
+
       if (theme === 'system') {
         const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         root.classList.add(systemDark ? 'dark' : 'light');
@@ -40,7 +40,7 @@ const App: React.FC = () => {
         applyTheme('system');
       }
     };
-    
+
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [uiTheme]);
@@ -52,30 +52,31 @@ const App: React.FC = () => {
   };
 
   return (
-    <div 
+    <div
       className="flex flex-col h-screen overflow-hidden text-slate-800 dark:text-slate-200 font-display transition-colors duration-300"
       style={{ backgroundColor: documentState.appBackground }}
     >
-      <Header 
-        uiTheme={uiTheme} 
-        setUiTheme={setUiTheme} 
+      <Header
+        uiTheme={uiTheme}
+        setUiTheme={setUiTheme}
         documentState={documentState}
         setDocumentState={setDocumentState}
         onFileUpload={setUploadedFile}
         onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        currentFile={uploadedFile}
       />
       <div className="flex-1 flex overflow-hidden relative">
-        <Editor 
-          state={documentState} 
-          file={uploadedFile} 
+        <Editor
+          state={documentState}
+          file={uploadedFile}
           onCloseFile={() => setUploadedFile(null)}
           onFileUpload={setUploadedFile}
           zoom={zoom}
           setZoom={setZoom}
         />
-        <Sidebar 
-          state={documentState} 
-          onChange={setDocumentState} 
+        <Sidebar
+          state={documentState}
+          onChange={setDocumentState}
           onReset={handleReset}
           isMobileOpen={isMobileSidebarOpen}
           onMobileClose={() => setIsMobileSidebarOpen(false)}
