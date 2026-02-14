@@ -68,3 +68,12 @@ export interface FontMapping {
 }
 
 export type UITheme = 'light' | 'dark' | 'system';
+
+// Multi-file state types
+export interface FileState {
+  id: string;
+  file: File;
+  status: 'pending' | 'converting' | 'converted' | 'error';
+  convertedFile?: File;
+  error?: string;
+}

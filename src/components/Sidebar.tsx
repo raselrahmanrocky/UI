@@ -33,8 +33,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
   ]);
 
   const [isLoadingFonts, setIsLoadingFonts] = useState(false);
+  const [localFontsLoaded, setLocalFontsLoaded] = useState(false);
 
   // Sidebar Layout State
+
+  // Auto-load cached local fonts on mount
+  useEffect(() => {
+    const cachedFonts = localStorage.getItem('local-fonts');
+    if (cachedFonts) {
+      try {
+        const fonts = JSON.parse(cachedFonts);
+        if (Array.isArray(fonts) && fonts.length > 0) {
+          setAvailableFonts(prev => {
+            const fontSet = new Set([...prev, ...fonts]);
+            return Array.from(fontSet).sort();
+          });
+          setLocalFontsLoaded(true);
+        }
+      } catch (e) {
+        console.error('Error parsing cached fonts:', e);
+        localStorage.removeItem('local-fonts');
+      }
+    }
+  }, []);
   const [width, setWidth] = useState(320);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -66,13 +87,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
       try {
         // @ts-ignore - Experimental API
         const localFonts = await window.queryLocalFonts();
-        const fontSet = new Set(availableFonts);
-        for (const font of localFonts) {
-          fontSet.add(font.family);
-        }
-        setAvailableFonts(Array.from(fontSet).sort());
+        const newFontNames = localFonts.map((font: { family: string }) => font.family);
+        
+        // Merge with existing fonts
+        const fontSet = new Set([...availableFonts, ...newFontNames]);
+        const mergedFonts = Array.from(fontSet).sort();
+        
+        setAvailableFonts(mergedFonts);
+        setLocalFontsLoaded(true);
+        
+        // Save to localStorage for next visit
+        localStorage.setItem('local-fonts', JSON.stringify(newFontNames));
       } catch (err) {
         console.error('Error loading fonts:', err);
+        alert('Unable to access local fonts. Please ensure you have granted permission.');
       } finally {
         setIsLoadingFonts(false);
       }
@@ -190,13 +218,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                   <button
                     onClick={handleLoadLocalFonts}
                     disabled={isLoadingFonts}
-                    className="text-primary hover:text-blue-600 disabled:text-slate-400 transition-all duration-200 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 flex items-center justify-center hover:scale-110"
-                    title={isLoadingFonts ? "Loading fonts..." : "Load local fonts from computer"}
+                    className="text-primary hover:text-blue-600 disabled:text-slate-400 transition-all duration-200 p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 flex items-center justify-center hover:scale-110 relative"
+                    title={isLoadingFonts ? "Loading fonts..." : localFontsLoaded ? "Refresh local fonts" : "Load local fonts from computer"}
                   >
                     {isLoadingFonts ? (
                       <span className="material-icons-outlined text-lg animate-spin">refresh</span>
                     ) : (
-                      <span className="material-icons-outlined text-lg">download</span>
+                      <>
+                        <span className="material-icons-outlined text-lg">{localFontsLoaded ? 'refresh' : 'download'}</span>
+                        {localFontsLoaded && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" title="Local fonts loaded"></span>
+                        )}
+                      </>
                     )}
                   </button>
                 </div>

@@ -1,35 +1,30 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { DocumentState, FootnoteData } from '../types';
+import { DocumentState, FootnoteData, FileState } from '../types';
 import { renderAsync } from 'docx-preview';
-import JSZip from 'jszip';
-import { convertXmlDocument } from '../convert/bijoytounicode';
-import { convertXmlDocumentToBijoy } from '../convert/unicodetobijoy';
 import { extractFootnotesFromDocx } from '../utils/extractFootnotes';
 
 interface EditorProps {
   state: DocumentState;
-  file?: File | null;
-  onCloseFile?: () => void;
-  onFileUpload?: (file: File) => void;
+  files: FileState[];
+  currentIndex: number;
+  onSelectFile: (index: number) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFileUpload, zoom, setZoom }) => {
+export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom }) => {
+  const currentFileState = currentIndex >= 0 && currentIndex < files.length ? files[currentIndex] : null;
+  // Use converted file if available, otherwise use original
+  const file = currentFileState?.convertedFile || currentFileState?.file || null;
+  const isShowingConverted = currentFileState?.status === 'converted';
   const docxContainerRef = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLElement>(null);
   const contentWrapperRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [showFootnotePanel, setShowFootnotePanel] = useState(false);
   const [hasFootnotes, setHasFootnotes] = useState(false);
   const [footnotes, setFootnotes] = useState<FootnoteData[]>([]);
-
-  // Conversion UI State
-  const [conversionType, setConversionType] = useState<'legacyToUnicode' | 'unicodeToLegacy'>('legacyToUnicode');
-  const [forceConvert, setForceConvert] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
   // Footnote Panel Resize State
   const [footnotePanelWidth, setFootnotePanelWidth] = useState(320);
@@ -189,118 +184,8 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
     window.addEventListener('mouseup', handleMouseUp);
   }, [footnotePanelWidth]);
 
-  // Drag and Drop Handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
 
-  const handleBatchConvert = async (files: File[]) => {
-    if (files.length === 0) return;
-
-    setIsRendering(true);
-    setRenderError(null);
-
-    try {
-      const processedFiles: File[] = [];
-
-      for (const file of files) {
-        const zip = new JSZip();
-        const content = await zip.loadAsync(file);
-        
-        // Find all XML files that might contain text
-        const xmlFiles = Object.keys(content.files).filter(path => 
-          path.startsWith('word/') && path.endsWith('.xml')
-        );
-
-        for (const path of xmlFiles) {
-          const xmlFile = content.file(path);
-          if (xmlFile) {
-            const xmlText = await xmlFile.async('string');
-            let convertedXml: string;
-
-            if (conversionType === 'legacyToUnicode') {
-              const isStyleFile = path.includes('styles.xml');
-              convertedXml = convertXmlDocument(xmlText, isStyleFile, forceConvert);
-            } else {
-              convertedXml = convertXmlDocumentToBijoy(xmlText);
-            }
-
-            zip.file(path, convertedXml);
-          }
-        }
-
-        const convertedBlob = await zip.generateAsync({ type: 'blob' });
-        const convertedFile = new File([convertedBlob], file.name, { type: file.type });
-        processedFiles.push(convertedFile);
-      }
-
-      if (processedFiles.length === 1) {
-        // Single file: trigger preview and extract footnotes
-        if (onFileUpload) {
-          onFileUpload(processedFiles[0]);
-        }
-        // Extract footnotes from converted file
-        const convertedFootnotes = await extractFootnotesFromDocx(processedFiles[0]);
-        setFootnotes(convertedFootnotes);
-        if (convertedFootnotes.length > 0) {
-          setHasFootnotes(true);
-        }
-      } else {
-        // Multiple files: trigger batch download
-        for (const file of processedFiles) {
-          const url = URL.createObjectURL(file);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `converted_${file.name}`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }
-        setIsRendering(false);
-      }
-    } catch (err) {
-      console.error("Conversion error:", err);
-      setRenderError("Failed to convert document(s).");
-      setIsRendering(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    const docxFiles = droppedFiles.filter(f => f.name.endsWith('.docx'));
-    
-    if (docxFiles.length > 0) {
-      handleBatchConvert(docxFiles);
-    } else if (droppedFiles.length > 0) {
-      alert('Please drop valid .docx files.');
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFiles = Array.from(e.target.files);
-      const docxFiles = selectedFiles.filter(f => f.name.endsWith('.docx'));
-      
-      if (docxFiles.length > 0) {
-        handleBatchConvert(docxFiles);
-      } else {
-        alert('Please select valid .docx files.');
-      }
-    }
-    // Reset input
-    if (e.target) {
-      e.target.value = '';
-    }
-  };
 
 
 
@@ -314,11 +199,16 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
       >
         {/* Toolbar for Document */}
         <div className="w-full px-4 py-2 flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10 transition-colors duration-300">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 max-w-[200px] sm:max-w-xs">
-              <span className="material-icons-outlined text-primary">description</span>
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file.name}</span>
-            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 max-w-[200px] sm:max-w-xs">
+                <span className="material-icons-outlined text-primary">description</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file.name}</span>
+                {isShowingConverted && (
+                  <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-full uppercase tracking-wide">
+                    Converted
+                  </span>
+                )}
+              </div>
 
             {hasFootnotes && (
               <button
@@ -331,13 +221,31 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
               </button>
             )}
           </div>
-          <button
-            onClick={onCloseFile}
-            className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded shadow-sm border border-slate-200 dark:border-slate-700 transition-all duration-200 text-sm font-medium"
-          >
-            <span className="material-icons-outlined text-sm">close</span>
-            <span className="hidden sm:inline">Close</span>
-          </button>
+          
+          {/* File Navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onSelectFile(currentIndex - 1)}
+              disabled={currentIndex <= 0}
+              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
+              title="Previous File"
+            >
+              <span className="material-icons-outlined text-sm">chevron_left</span>
+            </button>
+            
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 min-w-[60px] text-center">
+              {currentIndex + 1} / {files.length}
+            </span>
+            
+            <button
+              onClick={() => onSelectFile(currentIndex + 1)}
+              disabled={currentIndex >= files.length - 1}
+              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
+              title="Next File"
+            >
+              <span className="material-icons-outlined text-sm">chevron_right</span>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 flex overflow-hidden relative">
@@ -491,110 +399,21 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
             backgroundColor: state.paper.backgroundColor,
           }}
         >
-          {/* Conversion UI Content */}
-          <div className="flex flex-col items-center h-full">
-            <h1 className="text-2xl md:text-3xl font-bold mb-8 font-display text-center" style={{ color: state.body.color }}>
-              Batch Document Conversion
+          {/* Empty State */}
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="relative w-20 h-20 rounded-2xl flex items-center justify-center mb-6">
+              <div className="absolute inset-0 rounded-2xl opacity-10" style={{ backgroundColor: state.body.color }}></div>
+              <span className="material-icons-outlined text-4xl relative" style={{ color: state.body.color }}>folder_open</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-4 font-display text-center" style={{ color: state.body.color }}>
+              No Files Selected
             </h1>
-
-            {/* Toggles */}
-            <div className="flex flex-col sm:flex-row p-1 rounded-xl sm:rounded-full mb-6 w-full sm:w-auto relative">
-              {/* Background for toggles to ensure visibility on any paper color */}
-              <div className="absolute inset-0 rounded-xl sm:rounded-full opacity-10" style={{ backgroundColor: state.body.color }}></div>
-
-              <button
-                onClick={() => setConversionType('legacyToUnicode')}
-                className={`px-6 py-2 rounded-lg sm:rounded-full text-sm font-medium transition-all relative z-10 ${conversionType === 'legacyToUnicode'
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'hover:opacity-80'
-                  }`}
-                style={conversionType !== 'legacyToUnicode' ? { color: state.body.color, opacity: 0.7 } : {}}
-              >
-                Legacy (Bijoy) → Unicode
-              </button>
-              <button
-                onClick={() => setConversionType('unicodeToLegacy')}
-                className={`px-6 py-2 rounded-lg sm:rounded-full text-sm font-medium transition-all relative z-10 ${conversionType === 'unicodeToLegacy'
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'hover:opacity-80'
-                  }`}
-                style={conversionType !== 'unicodeToLegacy' ? { color: state.body.color, opacity: 0.7 } : {}}
-              >
-                Unicode → Legacy (Bijoy)
-              </button>
-            </div>
-
-            <p className="mb-4 text-sm text-center opacity-70 px-4" style={{ color: state.body.color }}>
-              Upload .docx files to convert {conversionType === 'legacyToUnicode' ? 'SuttonyMJ/Bijoy to Unicode' : 'Unicode to SuttonyMJ/Bijoy'}.
+            <p className="text-sm text-center opacity-70 px-4 max-w-md mb-6" style={{ color: state.body.color }}>
+              Add DOCX files using the file sidebar on the left. You can convert multiple files at once and navigate between them.
             </p>
-
-            {/* Checkbox - Only show for Legacy to Unicode */}
-            <div
-              className={`
-                  overflow-hidden transition-all duration-300 ease-in-out w-full flex justify-center
-                  ${conversionType === 'legacyToUnicode' ? 'max-h-20 opacity-100 mb-12' : 'max-h-0 opacity-0 mb-0'}
-                `}
-            >
-              <div className="flex items-center gap-2 px-4 text-center">
-                <input
-                  type="checkbox"
-                  id="forceConvert"
-                  checked={forceConvert}
-                  onChange={(e) => setForceConvert(e.target.checked)}
-                  className="rounded border-slate-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="forceConvert" className="text-sm font-medium select-none cursor-pointer" style={{ color: state.body.color }}>
-                  Force Convert (Use if file font isn't detected)
-                </label>
-              </div>
-            </div>
-
-            {/* Spacer if checkbox is hidden to maintain layout balance */}
-            {conversionType !== 'legacyToUnicode' && <div className="mb-12 transition-all duration-300"></div>}
-
-            {/* Hidden File Input */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".docx"
-              onChange={handleFileInputChange}
-            />
-
-            {/* Drop Zone */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`
-                  w-full max-w-2xl h-56 md:h-64 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer
-                  ${isDragging
-                  ? 'border-primary bg-primary/5 scale-[1.02]'
-                  : 'hover:border-primary/50'
-                }
-                `}
-              style={{
-                borderColor: isDragging ? undefined : state.body.color,
-                opacity: isDragging ? 1 : 0.6
-              }}
-            >
-              <div className="relative w-12 h-12 rounded-xl flex items-center justify-center mb-4">
-                <div className="absolute inset-0 rounded-xl opacity-10" style={{ backgroundColor: state.body.color }}></div>
-                <span className="material-icons-outlined text-2xl relative" style={{ color: state.body.color }}>cloud_upload</span>
-              </div>
-              <h3 className="text-lg font-semibold mb-1" style={{ color: state.body.color }}>Drop Word Documents</h3>
-              <p className="text-sm mb-4 opacity-60" style={{ color: state.body.color }}>Select multiple files to batch convert</p>
-              <span
-                className="px-3 py-1 text-[10px] font-bold tracking-wider rounded-full uppercase"
-                style={{
-                  backgroundColor: state.body.color,
-                  color: state.paper.backgroundColor,
-                  opacity: 0.8
-                }}
-              >
-                {conversionType === 'legacyToUnicode' ? 'SuttonyMJ / Bijoy Only' : 'Unicode Only'}
-              </span>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span className="material-icons-outlined text-sm">info</span>
+              <span>Use the left sidebar to manage your files</span>
             </div>
           </div>
         </div>

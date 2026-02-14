@@ -7,9 +7,11 @@ interface HeaderProps {
   setUiTheme: (theme: UITheme) => void;
   documentState: DocumentState;
   setDocumentState: (state: DocumentState) => void;
-  onFileUpload: (file: File) => void;
+  onFilesUpload: (files: File[]) => void;
   onToggleSidebar?: () => void;
+  onToggleFileSidebar?: () => void;
   currentFile: File | null;
+  totalFiles: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,9 +19,11 @@ export const Header: React.FC<HeaderProps> = ({
   setUiTheme,
   documentState,
   setDocumentState,
-  onFileUpload,
+  onFilesUpload,
   onToggleSidebar,
-  currentFile
+  onToggleFileSidebar,
+  currentFile,
+  totalFiles
 }) => {
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -71,9 +75,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      onFileUpload(file);
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      onFilesUpload(fileArray);
     }
     // Reset input so same file can be selected again if needed
     if (event.target) {
@@ -134,6 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
           ref={fileInputRef}
           className="hidden"
           accept=".docx"
+          multiple
           onChange={handleFileChange}
         />
         <button
@@ -142,6 +148,19 @@ export const Header: React.FC<HeaderProps> = ({
           title="Open DOCX File"
         >
           <span className="material-icons-outlined text-xl">folder_open</span>
+        </button>
+
+        {/* Mobile File Sidebar Toggle */}
+        <button
+          className="md:hidden p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors relative"
+          onClick={onToggleFileSidebar}
+        >
+          <span className="material-icons-outlined">folder_copy</span>
+          {totalFiles > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+              {totalFiles}
+            </span>
+          )}
         </button>
 
         {/* UI Theme Switcher (Light/Dark Mode) */}
