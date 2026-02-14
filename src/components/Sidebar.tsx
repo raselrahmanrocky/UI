@@ -250,8 +250,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
 
               {/* History Content in Collapsed State */}
               {isHistoryExpanded && (
-                <div className="absolute right-full mr-2 top-0 w-64 bg-white dark:bg-[#151b2b] border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 animate-fadeIn">
-                  <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div className="absolute right-full mr-2 top-[-50px] w-80 bg-white dark:bg-[#151b2b] border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 animate-fadeIn flex flex-col max-h-[calc(100vh-120px)]">
+                  <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between shrink-0">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">File History</span>
                     <button
                       onClick={() => setIsHistoryExpanded(false)}
@@ -260,7 +260,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                       <span className="material-icons-outlined text-sm">close</span>
                     </button>
                   </div>
-                  <div className="max-h-64 overflow-y-auto p-2">
+                  <div className="flex-1 overflow-y-auto p-2 min-h-0">
                     {fileHistory.length === 0 ? (
                       <p className="text-xs text-slate-400 text-center py-4">No files in history</p>
                     ) : (
@@ -305,12 +305,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                     )}
                   </div>
                   {fileHistory.length > 0 && (
-                    <button
-                      onClick={handleClearHistory}
-                      className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded transition-colors duration-200 mt-2 border-t border-slate-200 dark:border-slate-700"
-                    >
-                      Clear All History
-                    </button>
+                    <div className="shrink-0 p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#121620] rounded-b-lg">
+                      <button
+                        onClick={handleClearHistory}
+                        className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded transition-colors duration-200"
+                      >
+                        Clear All History
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
