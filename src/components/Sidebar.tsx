@@ -261,7 +261,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-2 min-h-0">
-                    {fileHistory.length === 0 ? (
+                    {isLoadingHistory ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="material-icons-outlined text-primary animate-spin">refresh</span>
+                        <span className="text-xs text-slate-500 ml-2">Loading history...</span>
+                      </div>
+                    ) : fileHistory.length === 0 ? (
                       <p className="text-xs text-slate-400 text-center py-4">No files in history</p>
                     ) : (
                       <div className="space-y-2">
