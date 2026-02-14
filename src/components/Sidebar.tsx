@@ -118,6 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
   }, []);
   const [width, setWidth] = useState(320);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -233,8 +234,90 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
             >
               <span className="material-icons-outlined text-lg">tune</span>
             </button>
+
+            {/* History Button in Collapsed State */}
+            <div className="relative">
+              <button
+                onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                className="p-2 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all duration-200 hover:scale-110 relative"
+                title="File History"
+              >
+                <span className="material-icons-outlined text-lg">history</span>
+                {fileHistory.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center">{fileHistory.length}</span>
+                )}
+              </button>
+
+              {/* History Content in Collapsed State */}
+              {isHistoryExpanded && (
+                <div className="absolute right-full mr-2 top-0 w-64 bg-white dark:bg-[#151b2b] border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 animate-fadeIn">
+                  <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">File History</span>
+                    <button
+                      onClick={() => setIsHistoryExpanded(false)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <span className="material-icons-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto p-2">
+                    {fileHistory.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-4">No files in history</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {fileHistory.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-slate-50 dark:bg-slate-800/50 rounded p-2 border border-slate-100 dark:border-slate-700/50"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate" title={item.convertedFileName}>
+                                  {item.convertedFileName}
+                                </p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                                  {item.originalFileName}
+                                </p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                                  {formatTimestamp(item.timestamp)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleDownloadHistoryItem(item)}
+                                  className="p-1 text-primary hover:bg-primary/10 rounded transition-colors duration-200"
+                                  title="Download"
+                                >
+                                  <span className="material-icons-outlined text-sm">download</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteHistoryItem(item.id)}
+                                  className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors duration-200"
+                                  title="Delete"
+                                >
+                                  <span className="material-icons-outlined text-sm">delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {fileHistory.length > 0 && (
+                    <button
+                      onClick={handleClearHistory}
+                      className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded transition-colors duration-200 mt-2 border-t border-slate-200 dark:border-slate-700"
+                    >
+                      Clear All History
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
+
           <div className="flex flex-col h-full w-full overflow-hidden animate-fadeIn">
             {/* Resize Handle (Desktop Only) */}
             <div
@@ -591,89 +674,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                 </div>
               </div>
 
-              {/* Section: File History */}
-              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 transition-colors duration-300">
-                <button
-                  className="w-full flex justify-between items-center mb-3 group hover:bg-slate-50 dark:hover:bg-slate-800/50 p-2 -mx-2 rounded transition-all duration-200"
-                  onClick={() => toggleSection('fileHistory')}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="material-icons-outlined text-lg text-primary">history</span>
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors duration-300">File History</span>
-                    {fileHistory.length > 0 && (
-                      <span className="px-1.5 py-0.5 bg-primary text-white text-xs rounded-full">{fileHistory.length}</span>
-                    )}
-                  </div>
-                  <span className={`material-icons-outlined text-slate-400 group-hover:text-primary transition-transform duration-300 text-lg ${expandedSections.fileHistory ? 'rotate-180' : ''}`}>expand_more</span>
-                </button>
-
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedSections.fileHistory ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="pl-2 border-l-2 border-slate-200 dark:border-slate-700 ml-1 pb-2 transition-colors duration-300">
-                    {isLoadingHistory ? (
-                      <div className="flex items-center justify-center py-4">
-                        <span className="material-icons-outlined text-primary animate-spin">refresh</span>
-                      </div>
-                    ) : fileHistory.length === 0 ? (
-                      <div className="text-center py-4 text-slate-400 dark:text-slate-500 text-sm">
-                        <span className="material-icons-outlined text-3xl mb-2">folder_open</span>
-                        <p>No files in history</p>
-                        <p className="text-xs mt-1">Converted files will appear here</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                          {fileHistory.map((item) => (
-                            <div
-                              key={item.id}
-                              className="bg-slate-50 dark:bg-slate-800/50 rounded p-2 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-all duration-200 mb-2 last:mb-0"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate" title={item.convertedFileName}>
-                                    {item.convertedFileName}
-                                  </p>
-                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                                    {item.originalFileName}
-                                  </p>
-                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                                    {formatTimestamp(item.timestamp)}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleDownloadHistoryItem(item)}
-                                    className="p-1 text-primary hover:bg-primary/10 rounded transition-colors duration-200"
-                                    title="Download"
-                                  >
-                                    <span className="material-icons-outlined text-sm">download</span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteHistoryItem(item.id)}
-                                    className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors duration-200"
-                                    title="Delete"
-                                  >
-                                    <span className="material-icons-outlined text-sm">delete</span>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {fileHistory.length > 0 && (
-                          <button
-                            onClick={handleClearHistory}
-                            className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded transition-colors duration-200 mt-2 border-t border-slate-200 dark:border-slate-700"
-                          >
-                            Clear All History
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
             </div>
+
 
             {/* Sidebar Footer / Actions */}
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#121620] shrink-0 transition-colors duration-300">
