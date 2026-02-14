@@ -209,20 +209,20 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                   <button
                     onClick={() => setConversionType('legacyToUnicode')}
                     className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${conversionType === 'legacyToUnicode'
-                        ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
-                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                       }`}
                   >
-                    Bijoy → Unicode
+                    SutonnyMJ → Unicode
                   </button>
                   <button
                     onClick={() => setConversionType('unicodeToLegacy')}
                     className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${conversionType === 'unicodeToLegacy'
-                        ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
-                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                       }`}
                   >
-                    Unicode → Bijoy
+                    Unicode → SutonnyMJ
                   </button>
                 </div>
 
