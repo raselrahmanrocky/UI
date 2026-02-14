@@ -47,8 +47,6 @@ const App: React.FC = () => {
 
   const handleReset = () => {
     setDocumentState(DEFAULT_STATE);
-    setUploadedFile(null);
-    setZoom(100);
   };
 
   return (
