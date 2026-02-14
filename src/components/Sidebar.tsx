@@ -88,14 +88,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
         // @ts-ignore - Experimental API
         const localFonts = await window.queryLocalFonts();
         const newFontNames = localFonts.map((font: { family: string }) => font.family);
-        
+
         // Merge with existing fonts
         const fontSet = new Set([...availableFonts, ...newFontNames]);
         const mergedFonts = Array.from(fontSet).sort();
-        
+
         setAvailableFonts(mergedFonts);
         setLocalFontsLoaded(true);
-        
+
         // Save to localStorage for next visit
         localStorage.setItem('local-fonts', JSON.stringify(newFontNames));
       } catch (err) {
@@ -467,8 +467,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                           <button
                             key={pos}
                             className={`flex-1 py-1 text-xs capitalize rounded transition-all duration-200 ${state.footnoteNumbers.position === pos
-                                ? 'bg-white dark:bg-slate-700 shadow-sm text-primary font-medium'
-                                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                              ? 'bg-white dark:bg-slate-700 shadow-sm text-primary font-medium'
+                              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                               }`}
                             onClick={() => updateFootnoteNumbers('position', pos)}
                           >

@@ -39,13 +39,13 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   // Conversion function for a single file
   const convertFile = async (fileState: FileState, index: number) => {
     setConvertingIndex(index);
-    
+
     try {
       const zip = new JSZip();
       const content = await zip.loadAsync(fileState.file);
-      
+
       // Find all XML files that might contain text
-      const xmlFiles = Object.keys(content.files).filter(path => 
+      const xmlFiles = Object.keys(content.files).filter(path =>
         path.startsWith('word/') && path.endsWith('.xml')
       );
 
@@ -68,9 +68,9 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
 
       const convertedBlob = await zip.generateAsync({ type: 'blob' });
       const convertedFile = new File([convertedBlob], fileState.file.name, { type: fileState.file.type });
-      
+
       onFileConverted(index, convertedFile);
-      
+
       // Auto-select this file to show converted version
       onSelectFile(index);
     } catch (err) {
@@ -95,7 +95,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
       const docxFiles = selectedFiles.filter(f => f.name.endsWith('.docx'));
-      
+
       if (docxFiles.length > 0) {
         onFilesUpload(docxFiles);
       } else {
@@ -208,26 +208,24 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                 <div className="flex bg-slate-100 dark:bg-slate-900 rounded p-1">
                   <button
                     onClick={() => setConversionType('legacyToUnicode')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${
-                      conversionType === 'legacyToUnicode'
+                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${conversionType === 'legacyToUnicode'
                         ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
                         : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
+                      }`}
                   >
                     Bijoy → Unicode
                   </button>
                   <button
                     onClick={() => setConversionType('unicodeToLegacy')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${
-                      conversionType === 'unicodeToLegacy'
+                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${conversionType === 'unicodeToLegacy'
                         ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
                         : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
+                      }`}
                   >
                     Unicode → Bijoy
                   </button>
                 </div>
-                
+
                 {conversionType === 'legacyToUnicode' && (
                   <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 cursor-pointer">
                     <input
@@ -275,8 +273,8 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                     key={fileState.id}
                     className={`
                       group p-3 rounded-lg border transition-all duration-200 cursor-pointer
-                      ${currentIndex === index 
-                        ? 'bg-primary/10 border-primary/30' 
+                      ${currentIndex === index
+                        ? 'bg-primary/10 border-primary/30'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary/50'
                       }
                     `}
@@ -311,7 +309,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                           <p className="text-xs text-red-500 mt-1">{fileState.error}</p>
                         )}
                       </div>
-                      
+
                       {/* Remove Button */}
                       <button
                         onClick={(e) => {
@@ -349,7 +347,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                           )}
                         </button>
                       )}
-                      
+
                       {(fileState.status === 'converted' || fileState.status === 'pending') && (
                         <button
                           onClick={(e) => {
@@ -382,7 +380,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                       <span className="material-icons-outlined text-sm">transform</span>
                       Convert All
                     </button>
-                    
+
                     <button
                       onClick={handleDownloadAll}
                       disabled={files.length === 0}
@@ -393,7 +391,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                     </button>
                   </div>
                 )}
-                
+
                 {/* Clear All - Always show when files exist */}
                 <button
                   onClick={handleClearAll}
