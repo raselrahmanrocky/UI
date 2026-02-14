@@ -175,7 +175,7 @@ const App: React.FC = () => {
     setCurrentFileIndex(newIndex);
   };
 
-  // Handle file conversion status update - with history tracking
+  // Handle file conversion status update
   const handleFileConverted = async (index: number, convertedFile: File) => {
     // Save to IndexedDB history (persistent storage)
     const originalFile = uploadedFiles[index]?.file;
@@ -187,29 +187,17 @@ const App: React.FC = () => {
       }
     }
 
-    const newFiles = [...uploadedFiles];
-    newFiles[index] = {
-      ...newFiles[index],
-      status: 'converted',
-      convertedFile
-    };
-
-    // Add to history
-    const newAppState: AppState = {
-      documentState,
-      uploadedFiles: newFiles,
-      currentFileIndex
-    };
-    addToHistory(newAppState);
-
-    setUploadedFiles(newFiles);
-
-    // Trigger a re-render to update file history in sidebar
-    setRefreshHistoryKey(prev => prev + 1);
+    // Create new array with updated file - using functional update to get latest state
+    setUploadedFiles(prevFiles => {
+      const newFiles = [...prevFiles];
+      newFiles[index] = {
+        ...newFiles[index],
+        status: 'converted',
+        convertedFile
+      };
+      return newFiles;
+    });
   };
-
-  // Key to trigger file history refresh in Sidebar
-  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0);
 
   // Handle file conversion error - with history tracking
   const handleFileError = (index: number, error: string) => {
@@ -297,7 +285,6 @@ const App: React.FC = () => {
           onReset={handleReset}
           isMobileOpen={isMobileSidebarOpen}
           onMobileClose={() => setIsMobileSidebarOpen(false)}
-          refreshKey={refreshHistoryKey}
         />
       </div>
       <Footer zoom={zoom} setZoom={setZoom} />

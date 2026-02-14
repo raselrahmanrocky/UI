@@ -33,15 +33,19 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   const [convertingIndex, setConvertingIndex] = useState<number | null>(null);
   const [conversionType, setConversionType] = useState<'legacyToUnicode' | 'unicodeToLegacy'>('legacyToUnicode');
   const [forceConvert, setForceConvert] = useState(false);
+  const [convertingTotal, setConvertingTotal] = useState<number>(0);
+  const [convertingCurrent, setConvertingCurrent] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Track current file index being converted (for sequential conversion)
-  const currentConvertIndexRef = useRef<number>(0);
+  // Check if any conversion is in progress
+  const isConverting = convertingIndex !== null || convertingTotal > 0;
 
   // Conversion function for a single file
-  const convertFile = async (fileState: FileState, index: number) => {
+  // isBatchMode: when true, don't auto-select the file in preview (for Convert All)
+  const convertFile = async (fileState: FileState, index: number, isBatchMode: boolean = false): Promise<boolean> => {
     setConvertingIndex(index);
+    setConvertingCurrent(index + 1);
 
     try {
       const zip = new JSZip();
@@ -74,11 +78,16 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
 
       onFileConverted(index, convertedFile);
 
-      // Auto-select this file to show converted version
-      onSelectFile(index);
+      // Auto-select this file to show converted version ONLY when not in batch mode
+      if (!isBatchMode) {
+        onSelectFile(index);
+      }
+
+      return true;
     } catch (err) {
       console.error("Conversion error:", err);
       onFileError(index, 'Failed to convert file');
+      return false;
     } finally {
       setConvertingIndex(null);
     }
@@ -86,15 +95,45 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
 
   // Convert all files sequentially from index 0 to end
   const handleConvertAll = async () => {
-    // Start from index 0 and convert sequentially
-    currentConvertIndexRef.current = 0;
+    if (files.length === 0) return;
 
-    for (let i = 0; i < files.length; i++) {
-      const fileState = files[i];
-      if (fileState.status === 'pending' || fileState.status === 'error') {
-        await convertFile(fileState, i);
+    // Create a snapshot of files to convert (both index and file object)
+    const filesToConvert = files
+      .map((f, index) => ({ fileState: f, index }))
+      .filter(f => f.fileState.status === 'pending' || f.fileState.status === 'error');
+
+    if (filesToConvert.length === 0) return;
+
+    setConvertingTotal(filesToConvert.length);
+    setConvertingCurrent(0);
+
+    console.log('Starting batch conversion of', filesToConvert.length, 'files');
+
+    // Convert each file one by one using our snapshot
+    for (let i = 0; i < filesToConvert.length; i++) {
+      const { fileState, index } = filesToConvert[i];
+
+      console.log('Converting file', i + 1, 'of', filesToConvert.length, '- index:', index);
+
+      setConvertingCurrent(i + 1);
+
+      try {
+        // Pass true for isBatchMode to skip auto-selecting in preview
+        await convertFile(fileState, index, true);
+        console.log('Successfully converted file at index:', index);
+
+        // Small delay between files to allow React to update UI
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (err) {
+        console.error('Error converting file at index:', index, err);
+        // Continue with next file even if this one fails
       }
     }
+
+    console.log('Batch conversion complete');
+    // Reset progress tracking
+    setConvertingTotal(0);
+    setConvertingCurrent(0);
   };
 
   // Handle file input change
@@ -392,11 +431,20 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={handleConvertAll}
-                      disabled={files.every(f => f.status === 'converted') || convertingIndex !== null}
+                      disabled={files.every(f => f.status === 'converted') || isConverting}
                       className="bg-primary hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white py-2 rounded text-sm font-medium transition-all duration-200 flex items-center justify-center gap-1 shadow-md shadow-blue-500/20"
                     >
-                      <span className="material-icons-outlined text-sm">transform</span>
-                      Convert All
+                      {isConverting ? (
+                        <>
+                          <span className="material-icons-outlined text-sm animate-spin">refresh</span>
+                          Converting {convertingCurrent} of {convertingTotal}...
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-icons-outlined text-sm">transform</span>
+                          Convert All
+                        </>
+                      )}
                     </button>
 
                     <button
