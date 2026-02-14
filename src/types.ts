@@ -58,4 +58,13 @@ export const DEFAULT_STATE: DocumentState = {
   appBackground: '#f6f6f8' // Default light background
 };
 
+export interface FootnoteData {
+  id: string;
+  content: string;
+}
+
+export interface FontMapping {
+  [key: string]: string;
+}
+
 export type UITheme = 'light' | 'dark' | 'system';

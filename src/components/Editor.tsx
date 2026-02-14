@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { DocumentState } from '../types';
+import { DocumentState, FootnoteData } from '../types';
 import { renderAsync } from 'docx-preview';
 import JSZip from 'jszip';
 import { convertXmlDocument } from '../convert/bijoytounicode';
 import { convertXmlDocumentToBijoy } from '../convert/unicodetobijoy';
+import { extractFootnotesFromDocx } from '../utils/extractFootnotes';
 
 interface EditorProps {
   state: DocumentState;
@@ -23,6 +24,7 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
   const [renderError, setRenderError] = useState<string | null>(null);
   const [showFootnotePanel, setShowFootnotePanel] = useState(false);
   const [hasFootnotes, setHasFootnotes] = useState(false);
+  const [footnotes, setFootnotes] = useState<FootnoteData[]>([]);
 
   // Conversion UI State
   const [conversionType, setConversionType] = useState<'legacyToUnicode' | 'unicodeToLegacy'>('legacyToUnicode');
@@ -77,18 +79,18 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
           });
       }
 
-      // 2. Check for footnotes using JSZip
-      const zip = new JSZip();
-      zip.loadAsync(file).then((content) => {
-        // Check if word/footnotes.xml exists in the zip structure
-        if (content.file("word/footnotes.xml")) {
+      // 2. Extract footnotes from the DOCX file
+      extractFootnotesFromDocx(file).then((extractedFootnotes) => {
+        setFootnotes(extractedFootnotes);
+        if (extractedFootnotes.length > 0) {
           setHasFootnotes(true);
         } else {
           setHasFootnotes(false);
           setShowFootnotePanel(false);
         }
       }).catch((err) => {
-        console.error("Error checking footnotes:", err);
+        console.error("Error extracting footnotes:", err);
+        setFootnotes([]);
         setHasFootnotes(false);
       });
 
@@ -239,9 +241,15 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
       }
 
       if (processedFiles.length === 1) {
-        // Single file: trigger preview
+        // Single file: trigger preview and extract footnotes
         if (onFileUpload) {
           onFileUpload(processedFiles[0]);
+        }
+        // Extract footnotes from converted file
+        const convertedFootnotes = await extractFootnotesFromDocx(processedFiles[0]);
+        setFootnotes(convertedFootnotes);
+        if (convertedFootnotes.length > 0) {
+          setHasFootnotes(true);
         }
       } else {
         // Multiple files: trigger batch download
@@ -420,54 +428,39 @@ export const Editor: React.FC<EditorProps> = ({ state, file, onCloseFile, onFile
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar min-w-[200px]">
-                {/* Placeholder for extracted footnotes - in a real app, we'd parse these from the docx */}
-                <div className="space-y-4">
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-100 dark:border-slate-700/50 transition-colors duration-300 hover:border-primary/30">
-                    <div className="flex gap-2 mb-1">
-                      <span
-                        className="font-bold text-xs transition-colors duration-300"
-                        style={{
-                          color: state.footnoteNumbers.accentColor,
-                          fontFamily: state.footnoteNumbers.fontFamily
-                        }}
-                      >1.</span>
-                      <p
-                        className="text-sm text-slate-600 dark:text-slate-300 transition-all duration-300"
-                        style={{
-                          fontFamily: state.footnotes.fontFamily,
-                          fontSize: `${state.footnotes.fontSize}px`,
-                          fontWeight: state.footnotes.fontWeight
-                        }}
-                      >
-                        This is a simulated footnote extracted from the document context. Real extraction would require deeper parsing of the DOCX structure.
-                      </p>
-                    </div>
+                {footnotes.length > 0 ? (
+                  <div className="space-y-4">
+                    {footnotes.map((footnote) => (
+                      <div key={footnote.id} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-100 dark:border-slate-700/50 transition-colors duration-300 hover:border-primary/30">
+                        <div className="flex gap-2 mb-1">
+                          <span
+                            className="font-bold text-xs flex-shrink-0 transition-colors duration-300"
+                            style={{
+                              color: state.footnoteNumbers.accentColor,
+                              fontFamily: state.footnoteNumbers.fontFamily
+                            }}
+                          >
+                            {footnote.id}.
+                          </span>
+                          <p
+                            className="text-sm text-slate-600 dark:text-slate-300 transition-all duration-300 leading-relaxed"
+                            style={{
+                              fontFamily: state.footnotes.fontFamily,
+                              fontSize: `${state.footnotes.fontSize}px`,
+                              fontWeight: state.footnotes.fontWeight
+                            }}
+                          >
+                            {footnote.content}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-100 dark:border-slate-700/50 transition-colors duration-300 hover:border-primary/30">
-                    <div className="flex gap-2 mb-1">
-                      <span
-                        className="font-bold text-xs transition-colors duration-300"
-                        style={{
-                          color: state.footnoteNumbers.accentColor,
-                          fontFamily: state.footnoteNumbers.fontFamily
-                        }}
-                      >2.</span>
-                      <p
-                        className="text-sm text-slate-600 dark:text-slate-300 transition-all duration-300"
-                        style={{
-                          fontFamily: state.footnotes.fontFamily,
-                          fontSize: `${state.footnotes.fontSize}px`,
-                          fontWeight: state.footnotes.fontWeight
-                        }}
-                      >
-                        Another footnote example to demonstrate the split view capability.
-                      </p>
-                    </div>
-                  </div>
+                ) : (
                   <div className="text-center py-8 text-slate-400 text-xs italic animate-fadeIn">
-                    <p>Footnote extraction from DOCX is simulated in this preview.</p>
+                    <p>No footnotes found in this document.</p>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

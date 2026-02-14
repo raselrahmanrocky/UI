@@ -128,11 +128,11 @@ export function convertUnicodeToBijoy(unicodeInput: string): string {
     let text = unicodeInput;
     const cluster = `(?:(?:[${CONSONANTS}]${HASANTA})+[${CONSONANTS}]|[${CONSONANTS}])`;
 
-    text = text.replace(new RegExp(`(${cluster})(${O_KAR}|${OU_KAR})`, 'g'), (m, base, vowel) => {
+    text = text.replace(new RegExp(`(${cluster})(${O_KAR}|${OU_KAR})`, 'g'), (_m, base, vowel) => {
         return vowel === O_KAR ? base + E_KAR + AKAR : base + E_KAR + OU_PART2;
     });
 
-    text = text.replace(new RegExp(`(${REF})?(${cluster})(${I_KAR}|${E_KAR}|${OI_KAR})`, 'g'), (m, reph, base, vowel) => {
+    text = text.replace(new RegExp(`(${REF})?(${cluster})(${I_KAR}|${E_KAR}|${OI_KAR})`, 'g'), (_m, reph, base, vowel) => {
         return vowel + (reph || '') + base;
     });
 
@@ -324,7 +324,6 @@ export function convertXmlDocument(xmlText: string, isStyleFile: boolean = false
         // Run-level decision based on Font and Content
         let isSutonny = false;
         let isKnownEnglish = false;
-        let detectedFont = "";
 
         const rPrs = getNodes(run, 'rPr');
 
@@ -335,7 +334,6 @@ export function convertXmlDocument(xmlText: string, isStyleFile: boolean = false
         const checkFontVal = (val: string | null) => {
             if (!val) return;
             const lowerVal = val.toLowerCase();
-            detectedFont = val;
             if (lowerVal.includes('sutonny') || lowerVal.includes('suttony') || lowerVal.includes('bijoy')) {
                 isSutonny = true;
             }
