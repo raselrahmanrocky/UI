@@ -10,7 +10,7 @@ interface HeaderProps {
   onFilesUpload: (files: File[]) => void;
   onToggleSidebar?: () => void;
   onToggleFileSidebar?: () => void;
-  currentFile: File | null;
+  convertedFile?: File | null;
   totalFiles: number;
 }
 
@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onFilesUpload,
   onToggleSidebar,
   onToggleFileSidebar,
-  currentFile,
+  convertedFile,
   totalFiles
 }) => {
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
@@ -86,17 +86,17 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
   const handleDownload = () => {
-    if (currentFile) {
-      const url = URL.createObjectURL(currentFile);
+    if (convertedFile) {
+      const url = URL.createObjectURL(convertedFile);
       const link = document.createElement('a');
       link.href = url;
-      link.download = currentFile.name;
+      link.download = convertedFile.name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } else {
-      alert("No document loaded to download.");
+      alert("Please convert the file first before downloading.");
     }
   };
 
@@ -219,7 +219,9 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           onClick={handleDownload}
-          className="bg-primary hover:bg-blue-600 text-white px-3 py-1.5 md:px-4 rounded text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95"
+          disabled={!convertedFile}
+          className="bg-primary hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white px-3 py-1.5 md:px-4 rounded text-sm font-medium transition-all duration-200 flex items-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 active:scale-95 disabled:shadow-none"
+          title={convertedFile ? "Download converted file" : "Convert file first"}
         >
           <span className="material-icons-outlined text-sm">download</span>
           <span className="hidden sm:inline">Download</span>

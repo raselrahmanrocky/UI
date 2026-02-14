@@ -139,7 +139,7 @@ const App: React.FC = () => {
         onFilesUpload={handleFilesUpload}
         onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         onToggleFileSidebar={() => setIsMobileFileSidebarOpen(!isMobileFileSidebarOpen)}
-        currentFile={currentFile?.file || null}
+        convertedFile={currentFile?.convertedFile || null}
         totalFiles={uploadedFiles.length}
       />
       <div className="flex-1 flex overflow-hidden relative">
