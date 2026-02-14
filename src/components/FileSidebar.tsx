@@ -272,7 +272,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                   <div
                     key={fileState.id}
                     className={`
-                      group p-3 rounded-lg border transition-all duration-200 cursor-pointer
+                      group p-3 rounded-lg border transition-all duration-200 cursor-pointer relative
                       ${currentIndex === index
                         ? 'bg-primary/10 border-primary/30'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary/50'
@@ -280,7 +280,18 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                     `}
                     onClick={() => onSelectFile(index)}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    {/* Serial Number Badge */}
+                    <div className={`
+                      absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shadow-sm
+                      ${currentIndex === index
+                        ? 'bg-primary text-white'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }
+                    `}>
+                      {index + 1}
+                    </div>
+
+                    <div className="flex items-start justify-between gap-2 ml-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-1">
                           <span className="material-icons-outlined text-sm text-slate-400">description</span>
