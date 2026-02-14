@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { DocumentState } from '../types';
+import { getFileHistory, deleteFromFileHistory, downloadFromHistory, formatTimestamp, clearFileHistory } from '../utils/indexedDB';
+
+interface FileHistoryItem {
+  id: string;
+  originalFileName: string;
+  convertedFileName: string;
+  convertedFile?: Blob;
+  timestamp: number;
+}
 
 interface SidebarProps {
   state: DocumentState;
@@ -7,15 +16,66 @@ interface SidebarProps {
   onReset: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
+  refreshKey?: number;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMobileOpen, onMobileClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMobileOpen, onMobileClose, refreshKey }) => {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     body: true,
     footnotes: false,
     footnoteNumbers: false,
     paper: false,
+    fileHistory: true,
   });
+
+  // File History State
+  const [fileHistory, setFileHistory] = useState<FileHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Load file history on mount and when refreshKey changes
+  useEffect(() => {
+    const loadHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const history = await getFileHistory();
+        setFileHistory(history);
+      } catch (err) {
+        console.error('Error loading file history:', err);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    loadHistory();
+  }, [refreshKey]);
+
+  // Handle delete from history
+  const handleDeleteHistoryItem = async (id: string) => {
+    try {
+      await deleteFromFileHistory(id);
+      setFileHistory(prev => prev.filter(item => item.id !== id));
+    } catch (err) {
+      console.error('Error deleting history item:', err);
+    }
+  };
+
+  // Handle download from history
+  const handleDownloadHistoryItem = (item: FileHistoryItem) => {
+    if (item.convertedFile) {
+      downloadFromHistory(item.convertedFile, item.convertedFileName);
+    }
+  };
+
+  // Handle clear all history
+  const handleClearHistory = async () => {
+    if (confirm('Are you sure you want to clear all file history?')) {
+      try {
+        await clearFileHistory();
+        setFileHistory([]);
+      } catch (err) {
+        console.error('Error clearing history:', err);
+      }
+    }
+  };
 
   const [availableFonts, setAvailableFonts] = useState<string[]>([
     'Merriweather',
@@ -527,6 +587,88 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                         ></div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: File History */}
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 transition-colors duration-300">
+                <button
+                  className="w-full flex justify-between items-center mb-3 group hover:bg-slate-50 dark:hover:bg-slate-800/50 p-2 -mx-2 rounded transition-all duration-200"
+                  onClick={() => toggleSection('fileHistory')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-outlined text-lg text-primary">history</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors duration-300">File History</span>
+                    {fileHistory.length > 0 && (
+                      <span className="px-1.5 py-0.5 bg-primary text-white text-xs rounded-full">{fileHistory.length}</span>
+                    )}
+                  </div>
+                  <span className={`material-icons-outlined text-slate-400 group-hover:text-primary transition-transform duration-300 text-lg ${expandedSections.fileHistory ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedSections.fileHistory ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="pl-2 border-l-2 border-slate-200 dark:border-slate-700 ml-1 pb-2 transition-colors duration-300">
+                    {isLoadingHistory ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="material-icons-outlined text-primary animate-spin">refresh</span>
+                      </div>
+                    ) : fileHistory.length === 0 ? (
+                      <div className="text-center py-4 text-slate-400 dark:text-slate-500 text-sm">
+                        <span className="material-icons-outlined text-3xl mb-2">folder_open</span>
+                        <p>No files in history</p>
+                        <p className="text-xs mt-1">Converted files will appear here</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                          {fileHistory.map((item) => (
+                            <div
+                              key={item.id}
+                              className="bg-slate-50 dark:bg-slate-800/50 rounded p-2 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-all duration-200 mb-2 last:mb-0"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate" title={item.convertedFileName}>
+                                    {item.convertedFileName}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                                    {item.originalFileName}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                                    {formatTimestamp(item.timestamp)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleDownloadHistoryItem(item)}
+                                    className="p-1 text-primary hover:bg-primary/10 rounded transition-colors duration-200"
+                                    title="Download"
+                                  >
+                                    <span className="material-icons-outlined text-sm">download</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteHistoryItem(item.id)}
+                                    className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors duration-200"
+                                    title="Delete"
+                                  >
+                                    <span className="material-icons-outlined text-sm">delete</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {fileHistory.length > 0 && (
+                          <button
+                            onClick={handleClearHistory}
+                            className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded transition-colors duration-200 mt-2 border-t border-slate-200 dark:border-slate-700"
+                          >
+                            Clear All History
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

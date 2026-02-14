@@ -12,6 +12,10 @@ interface HeaderProps {
   onToggleFileSidebar?: () => void;
   convertedFile?: File | null;
   totalFiles: number;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,7 +27,11 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onToggleFileSidebar,
   convertedFile,
-  totalFiles
+  totalFiles,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo
 }) => {
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -204,14 +212,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800 rounded p-1 transition-colors duration-300">
           <button
-            className="p-1.5 text-slate-500 hover:text-primary hover:bg-white dark:hover:bg-slate-700 rounded transition-all duration-200 hover:scale-110"
-            title="Undo"
+            className={`p-1.5 rounded transition-all duration-200 hover:scale-110 ${canUndo ? 'text-slate-500 hover:text-primary hover:bg-white dark:hover:bg-slate-700' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
+            onClick={onUndo}
+            disabled={!canUndo}
+            title={canUndo ? "Undo" : "Nothing to undo"}
           >
             <span className="material-icons-outlined text-sm">undo</span>
           </button>
           <button
-            className="p-1.5 text-slate-500 hover:text-primary hover:bg-white dark:hover:bg-slate-700 rounded transition-all duration-200 hover:scale-110"
-            title="Redo"
+            className={`p-1.5 rounded transition-all duration-200 hover:scale-110 ${canRedo ? 'text-slate-500 hover:text-primary hover:bg-white dark:hover:bg-slate-700' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
+            onClick={onRedo}
+            disabled={!canRedo}
+            title={canRedo ? "Redo" : "Nothing to redo"}
           >
             <span className="material-icons-outlined text-sm">redo</span>
           </button>

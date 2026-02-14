@@ -36,6 +36,9 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
+  // Track current file index being converted (for sequential conversion)
+  const currentConvertIndexRef = useRef<number>(0);
+
   // Conversion function for a single file
   const convertFile = async (fileState: FileState, index: number) => {
     setConvertingIndex(index);
@@ -81,11 +84,15 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
     }
   };
 
-  // Convert all files
+  // Convert all files sequentially from index 0 to end
   const handleConvertAll = async () => {
+    // Start from index 0 and convert sequentially
+    currentConvertIndexRef.current = 0;
+
     for (let i = 0; i < files.length; i++) {
-      if (files[i].status === 'pending' || files[i].status === 'error') {
-        await convertFile(files[i], i);
+      const fileState = files[i];
+      if (fileState.status === 'pending' || fileState.status === 'error') {
+        await convertFile(fileState, i);
       }
     }
   };

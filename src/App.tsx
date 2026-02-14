@@ -5,6 +5,20 @@ import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { FileSidebar } from './components/FileSidebar';
 import { DocumentState, DEFAULT_STATE, UITheme, FileState } from './types';
+import { saveToFileHistory } from './utils/indexedDB';
+
+// Unified history type that tracks all app state
+interface AppState {
+  documentState: DocumentState;
+  uploadedFiles: FileState[];
+  currentFileIndex: number;
+}
+
+const createInitialState = (): AppState => ({
+  documentState: DEFAULT_STATE,
+  uploadedFiles: [],
+  currentFileIndex: -1
+});
 
 const App: React.FC = () => {
   const [documentState, setDocumentState] = useState<DocumentState>(DEFAULT_STATE);
@@ -19,6 +33,66 @@ const App: React.FC = () => {
     }
     return 'system';
   });
+
+  // Unified Undo/Redo History State - tracks entire app state
+  const [history, setHistory] = useState<AppState[]>([createInitialState()]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Computed values for undo/redo availability
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  // Handle undo - restore entire app state
+  const handleUndo = () => {
+    if (canUndo) {
+      const newIndex = historyIndex - 1;
+      const prevState = history[newIndex];
+      setHistoryIndex(newIndex);
+      setDocumentState(prevState.documentState);
+      setUploadedFiles(prevState.uploadedFiles);
+      setCurrentFileIndex(prevState.currentFileIndex);
+    }
+  };
+
+  // Handle redo - restore entire app state
+  const handleRedo = () => {
+    if (canRedo) {
+      const newIndex = historyIndex + 1;
+      const nextState = history[newIndex];
+      setHistoryIndex(newIndex);
+      setDocumentState(nextState.documentState);
+      setUploadedFiles(nextState.uploadedFiles);
+      setCurrentFileIndex(nextState.currentFileIndex);
+    }
+  };
+
+  // Helper to add current state to history
+  const addToHistory = (newState: AppState) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newState);
+
+    // Limit history to 50 entries
+    if (newHistory.length > 50) {
+      newHistory.shift();
+      setHistoryIndex(newHistory.length - 1);
+    } else {
+      setHistoryIndex(newHistory.length - 1);
+    }
+
+    setHistory(newHistory);
+  };
+
+  // Update document state with history tracking
+  const handleDocumentStateChange = (newState: DocumentState) => {
+    const newAppState: AppState = {
+      documentState: newState,
+      uploadedFiles,
+      currentFileIndex
+    };
+
+    addToHistory(newAppState);
+    setDocumentState(newState);
+  };
 
   // Get current file
   const currentFile = currentFileIndex >= 0 && currentFileIndex < uploadedFiles.length
@@ -54,65 +128,107 @@ const App: React.FC = () => {
   }, [uiTheme]);
 
   const handleReset = () => {
-    setDocumentState(DEFAULT_STATE);
+    handleDocumentStateChange(DEFAULT_STATE);
   };
 
-  // Handle adding new files
+  // Handle adding new files - with history tracking
   const handleFilesUpload = (files: File[]) => {
     const newFileStates: FileState[] = files.map(file => ({
       id: Math.random().toString(36).substring(7),
       file,
       status: 'pending' as const
     }));
-    
-    setUploadedFiles(prev => [...prev, ...newFileStates]);
-    
-    // Select the first new file if none selected
-    if (currentFileIndex === -1 && newFileStates.length > 0) {
-      setCurrentFileIndex(uploadedFiles.length);
-    }
+
+    const newUploadedFiles = [...uploadedFiles, ...newFileStates];
+    const newFileIndex = currentFileIndex === -1 && newFileStates.length > 0
+      ? uploadedFiles.length
+      : currentFileIndex;
+
+    // Add to history
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: newUploadedFiles,
+      currentFileIndex: newFileIndex
+    };
+    addToHistory(newAppState);
+
+    setUploadedFiles(newUploadedFiles);
+    setCurrentFileIndex(newFileIndex);
   };
 
-  // Handle file removal
+  // Handle file removal - with history tracking
   const handleRemoveFile = (index: number) => {
-    setUploadedFiles(prev => {
-      const newFiles = prev.filter((_, i) => i !== index);
-      
-      // Adjust current index
-      if (currentFileIndex === index) {
-        setCurrentFileIndex(newFiles.length > 0 ? Math.min(index, newFiles.length - 1) : -1);
-      } else if (currentFileIndex > index) {
-        setCurrentFileIndex(currentFileIndex - 1);
+    const newFiles = uploadedFiles.filter((_, i) => i !== index);
+    const newIndex = currentFileIndex === index
+      ? (newFiles.length > 0 ? Math.min(index, newFiles.length - 1) : -1)
+      : (currentFileIndex > index ? currentFileIndex - 1 : currentFileIndex);
+
+    // Add to history
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: newFiles,
+      currentFileIndex: newIndex
+    };
+    addToHistory(newAppState);
+
+    setUploadedFiles(newFiles);
+    setCurrentFileIndex(newIndex);
+  };
+
+  // Handle file conversion status update - with history tracking
+  const handleFileConverted = async (index: number, convertedFile: File) => {
+    // Save to IndexedDB history (persistent storage)
+    const originalFile = uploadedFiles[index]?.file;
+    if (originalFile) {
+      try {
+        await saveToFileHistory(originalFile, convertedFile);
+      } catch (err) {
+        console.error('Error saving to file history:', err);
       }
-      
-      return newFiles;
-    });
+    }
+
+    const newFiles = [...uploadedFiles];
+    newFiles[index] = {
+      ...newFiles[index],
+      status: 'converted',
+      convertedFile
+    };
+
+    // Add to history
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: newFiles,
+      currentFileIndex
+    };
+    addToHistory(newAppState);
+
+    setUploadedFiles(newFiles);
+
+    // Trigger a re-render to update file history in sidebar
+    setRefreshHistoryKey(prev => prev + 1);
   };
 
-  // Handle file conversion status update
-  const handleFileConverted = (index: number, convertedFile: File) => {
-    setUploadedFiles(prev => {
-      const newFiles = [...prev];
-      newFiles[index] = {
-        ...newFiles[index],
-        status: 'converted',
-        convertedFile
-      };
-      return newFiles;
-    });
-  };
+  // Key to trigger file history refresh in Sidebar
+  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0);
 
-  // Handle file conversion error
+  // Handle file conversion error - with history tracking
   const handleFileError = (index: number, error: string) => {
-    setUploadedFiles(prev => {
-      const newFiles = [...prev];
-      newFiles[index] = {
-        ...newFiles[index],
-        status: 'error',
-        error
-      };
-      return newFiles;
-    });
+    const newFiles = [...uploadedFiles];
+    newFiles[index] = {
+      ...newFiles[index],
+      status: 'error',
+      error
+    };
+
+    // Add to history
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: newFiles,
+      currentFileIndex
+    };
+    addToHistory(newAppState);
+
+    setUploadedFiles(newFiles);
   };
 
   // Handle selecting a file
@@ -120,8 +236,16 @@ const App: React.FC = () => {
     setCurrentFileIndex(index);
   };
 
-  // Handle clearing all files
+  // Handle clearing all files - with history tracking
   const handleClearAllFiles = () => {
+    // Add to history
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: [],
+      currentFileIndex: -1
+    };
+    addToHistory(newAppState);
+
     setUploadedFiles([]);
     setCurrentFileIndex(-1);
   };
@@ -135,12 +259,16 @@ const App: React.FC = () => {
         uiTheme={uiTheme}
         setUiTheme={setUiTheme}
         documentState={documentState}
-        setDocumentState={setDocumentState}
+        setDocumentState={handleDocumentStateChange}
         onFilesUpload={handleFilesUpload}
         onToggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         onToggleFileSidebar={() => setIsMobileFileSidebarOpen(!isMobileFileSidebarOpen)}
         convertedFile={currentFile?.convertedFile || null}
         totalFiles={uploadedFiles.length}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
       <div className="flex-1 flex overflow-hidden relative">
         <FileSidebar
@@ -165,10 +293,11 @@ const App: React.FC = () => {
         />
         <Sidebar
           state={documentState}
-          onChange={setDocumentState}
+          onChange={handleDocumentStateChange}
           onReset={handleReset}
           isMobileOpen={isMobileSidebarOpen}
           onMobileClose={() => setIsMobileSidebarOpen(false)}
+          refreshKey={refreshHistoryKey}
         />
       </div>
       <Footer zoom={zoom} setZoom={setZoom} />
