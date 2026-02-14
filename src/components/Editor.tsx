@@ -223,27 +223,29 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
           </div>
           
           {/* File Navigation */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
             <button
               onClick={() => onSelectFile(currentIndex - 1)}
               disabled={currentIndex <= 0}
-              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-medium rounded shadow-md shadow-blue-500/20 transition-all duration-200"
               title="Previous File"
             >
-              <span className="material-icons-outlined text-sm">chevron_left</span>
+              <span className="material-icons-outlined text-sm">arrow_back</span>
+              <span className="hidden sm:inline">Previous</span>
             </button>
-            
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 min-w-[60px] text-center">
-              {currentIndex + 1} / {files.length}
+
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 min-w-[70px] text-center">
+              {currentIndex + 1} of {files.length}
             </span>
-            
+
             <button
               onClick={() => onSelectFile(currentIndex + 1)}
               disabled={currentIndex >= files.length - 1}
-              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-blue-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-medium rounded shadow-md shadow-blue-500/20 transition-all duration-200"
               title="Next File"
             >
-              <span className="material-icons-outlined text-sm">chevron_right</span>
+              <span className="hidden sm:inline">Next</span>
+              <span className="material-icons-outlined text-sm">arrow_forward</span>
             </button>
           </div>
         </div>
