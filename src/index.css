@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar for webkit */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Global Smooth Transitions */
+button, a, input, select, [role="button"], .interactive {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* Exclude transitions during resize actions if class is present */
+.no-transition, .no-transition * {
+  transition: none !important;
+}
+
+/* docx-preview overrides */
+.docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+}
+.docx-wrapper > section.docx {
+  box-shadow: none !important;
+  margin-bottom: 0 !important;
+}
