@@ -28,6 +28,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
     fileHistory: true,
   });
 
+  // Global Replacement State
+  const [searchFont, setSearchFont] = useState<string>('');
+
   // File History State
   const [fileHistory, setFileHistory] = useState<FileHistoryItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -74,6 +77,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
       } catch (err) {
         console.error('Error clearing history:', err);
       }
+    }
+  };
+
+  // Handle global font replacement
+  const handleGlobalReplace = () => {
+    if (!searchFont) {
+      alert('Please select a font to search for.');
+      return;
+    }
+
+    const replaceWithFont = state.body.fontFamily;
+
+    if (searchFont === replaceWithFont) {
+      alert('Please select a different font to replace with.');
+      return;
+    }
+
+    // Count matches and create new state
+    let matches = 0;
+    const newState = { ...state };
+
+    if (newState.body.fontFamily === searchFont) {
+      newState.body = { ...newState.body, fontFamily: replaceWithFont };
+      matches++;
+    }
+
+    if (newState.footnotes.fontFamily === searchFont) {
+      newState.footnotes = { ...newState.footnotes, fontFamily: replaceWithFont };
+      matches++;
+    }
+
+    if (newState.footnoteNumbers.fontFamily === searchFont) {
+      newState.footnoteNumbers = { ...newState.footnoteNumbers, fontFamily: replaceWithFont };
+      matches++;
+    }
+
+    if (matches > 0) {
+      onChange(newState);
+      alert(`Replaced font in ${matches} section${matches > 1 ? 's' : ''}.`);
+    } else {
+      alert('No matching fonts found to replace.');
     }
   };
 
@@ -222,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
           md:relative md:translate-x-0 md:z-10
         `}
         style={{
-          width: window.innerWidth < 768 ? '85%' : (isCollapsed ? '3rem' : width)
+          width: isCollapsed ? '3rem' : width
         }}
       >
         {isCollapsed ? (
@@ -387,7 +431,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                   <div>
                     <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1 transition-colors duration-300">Search for</label>
                     <div className="relative">
-                      <select className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded px-3 py-2 appearance-none focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600">
+                      <select
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded px-3 py-2 appearance-none focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600"
+                        value={searchFont}
+                        onChange={(e) => setSearchFont(e.target.value)}
+                      >
+                        <option value="">Select font...</option>
                         {availableFonts.map(font => (
                           <option key={`search-${font}`} value={font}>{font}</option>
                         ))}
@@ -412,9 +461,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                   </div>
                   <button
                     className="w-full bg-primary hover:bg-blue-600 text-white text-sm font-medium py-2 rounded mt-2 shadow-lg shadow-primary/20 transition-all duration-200 active:scale-[0.98] hover:shadow-primary/40"
-                    onClick={() => alert("Global replacement simulated! Styles updated.")}
+                    onClick={handleGlobalReplace}
                   >
-                    Replace All (14 matches)
+                    Replace All Fonts
                   </button>
                 </div>
               </div>
@@ -505,6 +554,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                   <div className="space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-700 ml-1 pb-2 transition-colors duration-300">
                     {/* Font Family */}
                     <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1 transition-colors duration-300">Font Family</label>
                       <div className="relative">
                         <select
                           className="w-full bg-transparent dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-sm rounded px-2 py-1.5 appearance-none focus:border-primary outline-none transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600"
@@ -662,7 +712,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                   <div className="space-y-3 pl-2 border-l-2 border-slate-200 dark:border-slate-700 ml-1 pb-2 transition-colors duration-300">
                     {/* Paper Color */}
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] uppercase tracking-wider text-slate-500 transition-colors duration-300">Background Color</label>
+                      <label className="text-[10px] uppercase tracking-wider text-slate-500 transition-colors duration-300">Paper Color</label>
                       <div className="flex items-center gap-2 cursor-pointer group relative">
                         <span className="text-xs text-slate-600 dark:text-slate-400 group-hover:text-white transition-colors duration-200">{state.paper.backgroundColor}</span>
                         <input
@@ -677,10 +727,110 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, onChange, onReset, isMo
                         ></div>
                       </div>
                     </div>
+                    {/* App Background Color */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <label className="text-[10px] uppercase tracking-wider text-slate-500 transition-colors duration-300">Page Background</label>
+                      <div className="flex items-center gap-2 cursor-pointer group relative">
+                        <span className="text-xs text-slate-600 dark:text-slate-400 group-hover:text-white transition-colors duration-200">{(state as any).appBackground || '#f6f6f8'}</span>
+                        <input
+                          type="color"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          value={(state as any).appBackground || '#f6f6f8'}
+                          onChange={(e) => onChange({ ...state, appBackground: e.target.value })}
+                        />
+                        <div
+                          className="w-6 h-6 rounded border border-slate-600 shadow-sm transition-all duration-200 group-hover:scale-110 group-hover:border-primary"
+                          style={{ backgroundColor: (state as any).appBackground || '#f6f6f8' }}
+                        ></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
+
+
+              {/* Section: File History */}
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 transition-colors duration-300 md:hidden">
+                <button
+                  className="w-full flex justify-between items-center mb-3 group hover:bg-slate-50 dark:hover:bg-slate-800/50 p-2 -mx-2 rounded transition-all duration-200"
+                  onClick={() => toggleSection('fileHistory')}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="material-icons-outlined text-lg text-primary">history</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors duration-300">File History</span>
+                    {fileHistory.length > 0 && (
+                      <span className="px-1.5 py-0.5 bg-primary text-white text-xs rounded-full">{fileHistory.length}</span>
+                    )}
+                  </div>
+                  <span className={`material-icons-outlined text-slate-400 group-hover:text-primary transition-transform duration-300 text-lg ${expandedSections.fileHistory ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedSections.fileHistory ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="pl-2 border-l-2 border-slate-200 dark:border-slate-700 ml-1 pb-2 transition-colors duration-300">
+                    {isLoadingHistory ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="material-icons-outlined text-primary animate-spin">refresh</span>
+                      </div>
+                    ) : fileHistory.length === 0 ? (
+                      <div className="text-center py-4 text-slate-400 dark:text-slate-500 text-sm">
+                        <span className="material-icons-outlined text-3xl mb-2">folder_open</span>
+                        <p>No files in history</p>
+                        <p className="text-xs mt-1">Converted files will appear here</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                          {fileHistory.map((item) => (
+                            <div
+                              key={item.id}
+                              className="bg-slate-50 dark:bg-slate-800/50 rounded p-2 border border-slate-100 dark:border-slate-700/50 hover:border-primary/30 transition-all duration-200 mb-2 last:mb-0"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate" title={item.convertedFileName}>
+                                    {item.convertedFileName}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                                    {item.originalFileName}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                                    {formatTimestamp(item.timestamp)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleDownloadHistoryItem(item)}
+                                    className="p-1 text-primary hover:bg-primary/10 rounded transition-colors duration-200"
+                                    title="Download"
+                                  >
+                                    <span className="material-icons-outlined text-sm">download</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteHistoryItem(item.id)}
+                                    className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors duration-200"
+                                    title="Delete"
+                                  >
+                                    <span className="material-icons-outlined text-sm">delete</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {fileHistory.length > 0 && (
+                          <button
+                            onClick={handleClearHistory}
+                            className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 py-2 rounded transition-colors duration-200 mt-2 border-t border-slate-200 dark:border-slate-700"
+                          >
+                            Clear All History
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
 
