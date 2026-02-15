@@ -7,26 +7,35 @@
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #374151;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #4b5563;
 }
 
 /* Global Smooth Transitions */
-button, a, input, select, [role="button"], .interactive {
+button,
+a,
+input,
+select,
+[role="button"],
+.interactive {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 300ms;
 }
 
 /* Exclude transitions during resize actions if class is present */
-.no-transition, .no-transition * {
+.no-transition,
+.no-transition * {
   transition: none !important;
 }
 
@@ -35,7 +44,90 @@ button, a, input, select, [role="button"], .interactive {
   background: transparent !important;
   padding: 0 !important;
 }
-.docx-wrapper > section.docx {
+
+.docx-wrapper>section.docx {
   box-shadow: none !important;
   margin-bottom: 0 !important;
+}
+
+/* Print Layout View - Page by Page like Microsoft Word */
+.print-layout-view .docx-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 24px 0 !important;
+}
+
+/* Target each individual page */
+.print-layout-view .docx_page {
+  background: white !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
+    0 8px 24px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 3px !important;
+  margin-bottom: 24px !important;
+  position: relative !important;
+  page-break-after: always !important;
+  break-after: page !important;
+}
+
+/* Add gap between pages using margin */
+.print-layout-view .docx_page+.docx_page {
+  margin-top: 0 !important;
+}
+
+/* Hide the section wrapper shadow in print layout */
+.print-layout-view .docx-wrapper>section.docx {
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Dark mode print layout adjustments */
+.dark .print-layout-view .docx_page {
+  background: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Web Layout View - Continuous scroll without page breaks */
+.web-layout-view .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.web-layout-view .docx-wrapper>section.docx {
+  box-shadow: none !important;
+  margin-bottom: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Hide page shadows in web layout */
+.web-layout-view .docx_page {
+  box-shadow: none !important;
+}
+
+/* Split View Layout - Two pages side by side */
+.split-layout-view .docx-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  padding: 16px 0 !important;
+}
+
+.split-layout-view .docx_page {
+  background: white !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12),
+    0 4px 16px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 2px !important;
+  margin-bottom: 0 !important;
+}
+
+/* Dark mode split view */
+.dark .split-layout-view .docx_page {
+  background: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
+    0 4px 16px rgba(0, 0, 0, 0.2) !important;
 }

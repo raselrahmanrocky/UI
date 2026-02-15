@@ -1,4 +1,5 @@
 import React from 'react';
+import { ViewMode } from '../types';
 
 interface FooterProps {
   zoom: number;
@@ -7,9 +8,11 @@ interface FooterProps {
   currentPage: number;
   totalPages: number;
   hasDocument: boolean;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ zoom, setZoom, wordCount, currentPage, totalPages, hasDocument }) => {
+export const Footer: React.FC<FooterProps> = ({ zoom, setZoom, wordCount, currentPage, totalPages, hasDocument, viewMode, setViewMode }) => {
   const handleZoomIn = () => {
     setZoom(Math.min(zoom + 10, 200));
   };
@@ -55,9 +58,30 @@ export const Footer: React.FC<FooterProps> = ({ zoom, setZoom, wordCount, curren
             <span className="material-icons-outlined text-[14px]">add</span>
           </button>
         </div>
-        <button className="hover:text-primary transition-colors duration-200 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" title="Print Layout">
-          <span className="material-icons-outlined text-[16px]">grid_view</span>
-        </button>
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+          <button
+            className={`p-1 rounded transition-all duration-200 ${viewMode === 'print' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+            onClick={() => setViewMode('print')}
+            title="Print Layout - Show pages with boundaries"
+          >
+            <span className="material-icons-outlined text-[14px]">article</span>
+          </button>
+          <button
+            className={`p-1 rounded transition-all duration-200 ${viewMode === 'web' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+            onClick={() => setViewMode('web')}
+            title="Web Layout - Continuous scroll without page breaks"
+          >
+            <span className="material-icons-outlined text-[14px]">view_agenda</span>
+          </button>
+          <button
+            className={`p-1 rounded transition-all duration-200 ${viewMode === 'split' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+            onClick={() => setViewMode('split')}
+            title="Split View - Show two pages side by side"
+          >
+            <span className="material-icons-outlined text-[14px]">view_column</span>
+          </button>
+        </div>
       </div>
     </footer>
   );

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { DocumentState, FootnoteData, FileState } from '../types';
+import { DocumentState, FootnoteData, FileState, ViewMode } from '../types';
 import { renderAsync } from 'docx-preview';
 import { extractFootnotesFromDocx } from '../utils/extractFootnotes';
 
@@ -16,15 +16,17 @@ interface EditorProps {
   onSelectFile: (index: number) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
+  viewMode: ViewMode;
   onStatsUpdate: (stats: DocumentStats) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom, onStatsUpdate }) => {
+export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
   const currentFileState = currentIndex >= 0 && currentIndex < files.length ? files[currentIndex] : null;
   // Use converted file if available, otherwise use original
   const file = currentFileState?.convertedFile || currentFileState?.file || null;
   const isShowingConverted = currentFileState?.status === 'converted';
   const docxContainerRef = useRef<HTMLDivElement>(null);
+  const docxContainerRef2 = useRef<HTMLDivElement>(null);
   const mainContainerRef = useRef<HTMLElement>(null);
   const contentWrapperRef = useRef<HTMLDivElement>(null);
   const [isRendering, setIsRendering] = useState(false);
@@ -32,6 +34,7 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
   const [showFootnotePanel, setShowFootnotePanel] = useState(false);
   const [hasFootnotes, setHasFootnotes] = useState(false);
   const [footnotes, setFootnotes] = useState<FootnoteData[]>([]);
+  const [splitPageOffset, setSplitPageOffset] = useState(1);
 
   // Footnote Panel Resize State
   const [footnotePanelWidth, setFootnotePanelWidth] = useState(320);
@@ -337,22 +340,79 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
               </div>
             )}
 
-            <div
-              ref={contentWrapperRef}
-              className={`transition-transform duration-200 ease-out origin-top-left ${isRendering ? 'opacity-0' : 'opacity-100'}`}
-              style={{
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center top'
-              }}
-            >
+            {viewMode === 'split' ? (
+              // Split View - Two pages side by side
               <div
-                ref={docxContainerRef}
-                className="w-full max-w-5xl transition-colors duration-300"
+                ref={contentWrapperRef}
+                className={`transition-transform duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                 style={{
-                  '--docx-background': state.paper.backgroundColor
-                } as React.CSSProperties}
-              />
-            </div>
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: 'center top'
+                }}
+              >
+                <div className="split-view-container flex gap-4">
+                  {/* First panel - starts from page 1 */}
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex justify-center mb-2">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Page 1</span>
+                    </div>
+                    <div
+                      ref={docxContainerRef}
+                      className="split-layout-view w-full transition-colors duration-300"
+                      style={{
+                        '--docx-background': state.paper.backgroundColor
+                      } as React.CSSProperties}
+                    />
+                  </div>
+                  {/* Second panel - starts from page offset */}
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex justify-center mb-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSplitPageOffset(Math.max(1, splitPageOffset - 1))}
+                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                          disabled={splitPageOffset <= 1}
+                        >
+                          <span className="material-icons-outlined text-sm">chevron_left</span>
+                        </button>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Page {splitPageOffset}</span>
+                        <button
+                          onClick={() => setSplitPageOffset(splitPageOffset + 1)}
+                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                        >
+                          <span className="material-icons-outlined text-sm">chevron_right</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      ref={docxContainerRef2}
+                      className="split-layout-view w-full transition-colors duration-300"
+                      style={{
+                        '--docx-background': state.paper.backgroundColor
+                      } as React.CSSProperties}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Normal View - Single container
+              <div
+                ref={contentWrapperRef}
+                className={`transition-transform duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'} ${viewMode === 'print' ? 'origin-center' : 'origin-top'}`}
+                style={{
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: viewMode === 'print' ? 'center top' : 'center top'
+                }}
+              >
+                <div
+                  ref={docxContainerRef}
+                  className={`w-full transition-colors duration-300 ${viewMode === 'print' ? 'max-w-5xl print-layout-view' : 'web-layout-view'}`}
+                  style={{
+                    '--docx-background': state.paper.backgroundColor
+                  } as React.CSSProperties}
+                />
+              </div>
+            )}
           </div>
 
           {/* Footnote Panel (Split View) */}

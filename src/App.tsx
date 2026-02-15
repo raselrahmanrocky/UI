@@ -4,7 +4,7 @@ import { Footer } from './components/Footer';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { FileSidebar } from './components/FileSidebar';
-import { DocumentState, DEFAULT_STATE, UITheme, FileState } from './types';
+import { DocumentState, DEFAULT_STATE, UITheme, FileState, ViewMode } from './types';
 import { saveToFileHistory } from './utils/indexedDB';
 
 // Unified history type that tracks all app state
@@ -25,6 +25,7 @@ const App: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<FileState[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState<number>(-1);
   const [zoom, setZoom] = useState(100);
+  const [viewMode, setViewMode] = useState<ViewMode>('print');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Document stats for footer
@@ -283,6 +284,7 @@ const App: React.FC = () => {
           onSelectFile={handleSelectFile}
           zoom={zoom}
           setZoom={setZoom}
+          viewMode={viewMode}
           onStatsUpdate={(stats) => {
             setWordCount(stats.wordCount);
             setCurrentPage(stats.currentPage);
@@ -304,6 +306,8 @@ const App: React.FC = () => {
         currentPage={currentPage}
         totalPages={totalPages}
         hasDocument={currentFile !== null}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
       />
     </div>
   );

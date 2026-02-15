@@ -68,6 +68,7 @@ export interface FontMapping {
 }
 
 export type UITheme = 'light' | 'dark' | 'system';
+export type ViewMode = 'print' | 'web' | 'split';
 
 // Multi-file state types
 export interface FileState {
