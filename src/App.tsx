@@ -26,6 +26,11 @@ const App: React.FC = () => {
   const [currentFileIndex, setCurrentFileIndex] = useState<number>(-1);
   const [zoom, setZoom] = useState(100);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Document stats for footer
+  const [wordCount, setWordCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   const [isMobileFileSidebarOpen, setIsMobileFileSidebarOpen] = useState(false);
   const [uiTheme, setUiTheme] = useState<UITheme>(() => {
     if (typeof window !== 'undefined') {
@@ -278,6 +283,11 @@ const App: React.FC = () => {
           onSelectFile={handleSelectFile}
           zoom={zoom}
           setZoom={setZoom}
+          onStatsUpdate={(stats) => {
+            setWordCount(stats.wordCount);
+            setCurrentPage(stats.currentPage);
+            setTotalPages(stats.totalPages);
+          }}
         />
         <Sidebar
           state={documentState}
@@ -287,7 +297,14 @@ const App: React.FC = () => {
           onMobileClose={() => setIsMobileSidebarOpen(false)}
         />
       </div>
-      <Footer zoom={zoom} setZoom={setZoom} />
+      <Footer
+        zoom={zoom}
+        setZoom={setZoom}
+        wordCount={wordCount}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        hasDocument={currentFile !== null}
+      />
     </div>
   );
 };

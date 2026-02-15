@@ -3,6 +3,12 @@ import { DocumentState, FootnoteData, FileState } from '../types';
 import { renderAsync } from 'docx-preview';
 import { extractFootnotesFromDocx } from '../utils/extractFootnotes';
 
+export interface DocumentStats {
+  wordCount: number;
+  currentPage: number;
+  totalPages: number;
+}
+
 interface EditorProps {
   state: DocumentState;
   files: FileState[];
@@ -10,9 +16,10 @@ interface EditorProps {
   onSelectFile: (index: number) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
+  onStatsUpdate: (stats: DocumentStats) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom }) => {
+export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom, onStatsUpdate }) => {
   const currentFileState = currentIndex >= 0 && currentIndex < files.length ? files[currentIndex] : null;
   // Use converted file if available, otherwise use original
   const file = currentFileState?.convertedFile || currentFileState?.file || null;
@@ -66,11 +73,14 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
         })
           .then(() => {
             setIsRendering(false);
+            // Calculate document stats after rendering
+            calculateAndReportStats();
           })
           .catch((err: any) => {
             console.error("Error rendering docx:", err);
             setRenderError("Failed to render document. Please ensure it is a valid .docx file.");
             setIsRendering(false);
+            onStatsUpdate({ wordCount: 0, currentPage: 1, totalPages: 0 });
           });
       }
 
@@ -92,8 +102,62 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
     } else {
       setHasFootnotes(false);
       setShowFootnotePanel(false);
+      // Reset stats when no file is loaded
+      onStatsUpdate({ wordCount: 0, currentPage: 1, totalPages: 0 });
     }
   }, [file]);
+
+  // Calculate word count and page count from rendered document
+  const calculateAndReportStats = () => {
+    if (!docxContainerRef.current) return;
+
+    // Count words from the document content
+    const textContent = docxContainerRef.current.innerText || '';
+    const words = textContent.trim().split(/\s+/).filter(word => word.length > 0);
+    const wordCount = words.length;
+
+    // Count pages - docx-preview creates sections with class 'docx_page'
+    const pages = docxContainerRef.current.querySelectorAll('.docx_page');
+    const totalPages = pages.length || 1;
+
+    // Initial stats with page 1 as current
+    onStatsUpdate({ wordCount, currentPage: 1, totalPages });
+  };
+
+  // Track current visible page on scroll
+  useEffect(() => {
+    const container = mainContainerRef.current;
+    if (!container || !file) return;
+
+    const handleScroll = () => {
+      if (!docxContainerRef.current) return;
+
+      const pages = docxContainerRef.current.querySelectorAll('.docx_page');
+      if (pages.length === 0) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.top + containerRect.height / 2;
+
+      let currentPage = 1;
+      pages.forEach((page, index) => {
+        const pageRect = page.getBoundingClientRect();
+        // Check if page is visible in the viewport
+        if (pageRect.top <= containerCenter && pageRect.bottom >= containerCenter) {
+          currentPage = index + 1;
+        }
+      });
+
+      // Get current word count
+      const textContent = docxContainerRef.current.innerText || '';
+      const words = textContent.trim().split(/\s+/).filter(word => word.length > 0);
+      const wordCount = words.length;
+
+      onStatsUpdate({ wordCount, currentPage, totalPages: pages.length });
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [file, onStatsUpdate]);
 
   // Mouse wheel zoom handler with cursor focus
   useEffect(() => {
@@ -199,16 +263,16 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
       >
         {/* Toolbar for Document */}
         <div className="w-full px-4 py-2 flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10 transition-colors duration-300">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 max-w-[200px] sm:max-w-xs">
-                <span className="material-icons-outlined text-primary">description</span>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file.name}</span>
-                {isShowingConverted && (
-                  <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-full uppercase tracking-wide">
-                    Converted
-                  </span>
-                )}
-              </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300 max-w-[200px] sm:max-w-xs">
+              <span className="material-icons-outlined text-primary">description</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file.name}</span>
+              {isShowingConverted && (
+                <span className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-full uppercase tracking-wide">
+                  Converted
+                </span>
+              )}
+            </div>
 
             {hasFootnotes && (
               <button
@@ -221,7 +285,7 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
               </button>
             )}
           </div>
-          
+
           {/* File Navigation */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
             <button
