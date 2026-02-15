@@ -41,6 +41,11 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
   const [isResizingFootnote, setIsResizingFootnote] = useState(false);
   const resizeRef = useRef({ startX: 0, startWidth: 0 });
 
+  // Page Navigation State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const pagesRef = useRef<NodeListOf<Element> | null>(null);
+
 
   // Mobile Detection
   const [isMobile, setIsMobile] = useState(false);
@@ -67,11 +72,13 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
           ignoreHeight: false,
           ignoreFonts: false,
           breakPages: true,
-          ignoreLastRenderedPageBreak: true,
+          ignoreLastRenderedPageBreak: false,
           experimental: false,
           trimXmlDeclaration: true,
           useBase64URL: false,
           renderChanges: false,
+          renderHeaders: true,
+          renderFooters: true,
           debug: false,
         })
           .then(() => {
@@ -121,11 +128,80 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
 
     // Count pages - docx-preview creates sections with class 'docx_page'
     const pages = docxContainerRef.current.querySelectorAll('.docx_page');
-    const totalPages = pages.length || 1;
+    const pageCount = pages.length || 1;
+
+    // Store pages reference and update local state
+    pagesRef.current = pages;
+    setTotalPages(pageCount);
+    setCurrentPage(1);
 
     // Initial stats with page 1 as current
-    onStatsUpdate({ wordCount, currentPage: 1, totalPages });
+    onStatsUpdate({ wordCount, currentPage: 1, totalPages: pageCount });
   };
+
+  // Scroll to a specific page
+  const scrollToPage = useCallback((pageNumber: number) => {
+    if (!docxContainerRef.current || !mainContainerRef.current) return;
+
+    const pages = docxContainerRef.current.querySelectorAll('.docx_page');
+    if (pages.length === 0) return;
+
+    const targetPage = Math.min(Math.max(pageNumber, 1), pages.length);
+    const pageElement = pages[targetPage - 1];
+
+    if (pageElement) {
+      pageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setCurrentPage(targetPage);
+      onStatsUpdate({
+        wordCount: 0, // Keep existing word count
+        currentPage: targetPage,
+        totalPages: pages.length
+      });
+    }
+  }, [onStatsUpdate]);
+
+  // Navigate to previous page
+  const goToPrevPage = useCallback(() => {
+    if (currentPage > 1) {
+      scrollToPage(currentPage - 1);
+    }
+  }, [currentPage, scrollToPage]);
+
+  // Navigate to next page
+  const goToNextPage = useCallback(() => {
+    if (currentPage < totalPages) {
+      scrollToPage(currentPage + 1);
+    }
+  }, [currentPage, totalPages, scrollToPage]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if no input/textarea is focused
+      if (document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.key === 'PageUp' || (e.key === 'ArrowUp' && !e.ctrlKey)) {
+        e.preventDefault();
+        goToPrevPage();
+      } else if (e.key === 'PageDown' || (e.key === 'ArrowDown' && !e.ctrlKey)) {
+        e.preventDefault();
+        goToNextPage();
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        scrollToPage(1);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        scrollToPage(totalPages);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToPrevPage, goToNextPage, scrollToPage, totalPages]);
 
   // Track current visible page on scroll
   useEffect(() => {
@@ -288,6 +364,47 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
               </button>
             )}
           </div>
+
+          {/* Page Navigation */}
+          {totalPages > 0 && (
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5">
+              <button
+                onClick={goToPrevPage}
+                disabled={currentPage <= 1}
+                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
+                title="Previous Page (PageUp)"
+              >
+                <span className="material-icons-outlined text-sm">chevron_left</span>
+              </button>
+
+              <div className="flex items-center gap-1.5 min-w-[100px] justify-center">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={currentPage}
+                  onChange={(e) => {
+                    const page = parseInt(e.target.value);
+                    if (!isNaN(page) && page >= 1 && page <= totalPages) {
+                      scrollToPage(page);
+                    }
+                  }}
+                  className="w-12 text-center text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
+                  title="Go to page"
+                />
+                <span className="text-xs text-slate-500 dark:text-slate-400">of {totalPages}</span>
+              </div>
+
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage >= totalPages}
+                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
+                title="Next Page (PageDown)"
+              >
+                <span className="material-icons-outlined text-sm">chevron_right</span>
+              </button>
+            </div>
+          )}
 
           {/* File Navigation */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
