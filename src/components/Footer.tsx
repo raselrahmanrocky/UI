@@ -58,7 +58,7 @@ export const Footer: React.FC<FooterProps> = ({ zoom, setZoom, wordCount, curren
             <span className="material-icons-outlined text-[14px]">add</span>
           </button>
         </div>
-        {/* View Mode Toggle */}
+        {/* View Mode Toggle - Print Layout Only */}
         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
           <button
             className={`p-1 rounded transition-all duration-200 ${viewMode === 'print' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
@@ -66,20 +66,6 @@ export const Footer: React.FC<FooterProps> = ({ zoom, setZoom, wordCount, curren
             title="Print Layout - Show pages with boundaries"
           >
             <span className="material-icons-outlined text-[14px]">article</span>
-          </button>
-          <button
-            className={`p-1 rounded transition-all duration-200 ${viewMode === 'web' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-            onClick={() => setViewMode('web')}
-            title="Web Layout - Continuous scroll without page breaks"
-          >
-            <span className="material-icons-outlined text-[14px]">view_agenda</span>
-          </button>
-          <button
-            className={`p-1 rounded transition-all duration-200 ${viewMode === 'split' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-            onClick={() => setViewMode('split')}
-            title="Split View - Show two pages side by side"
-          >
-            <span className="material-icons-outlined text-[14px]">view_column</span>
           </button>
         </div>
       </div>
