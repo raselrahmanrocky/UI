@@ -238,41 +238,39 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
     return () => container.removeEventListener('scroll', handleScroll);
   }, [file, onStatsUpdate]);
 
-  // Mouse wheel zoom handler with cursor focus
+  // Mouse wheel zoom handler — MS Office style (CSS zoom, cursor-anchored)
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
+
         const delta = e.deltaY > 0 ? -10 : 10;
         const newZoom = Math.min(Math.max(zoom + delta, 50), 200);
+        if (newZoom === zoom) return;
 
-        if (newZoom !== zoom && mainContainerRef.current && contentWrapperRef.current) {
-          // Calculate cursor position relative to the content
-          const rect = contentWrapperRef.current.getBoundingClientRect();
-          const offsetX = e.clientX - rect.left;
-          const offsetY = e.clientY - rect.top;
-
-          // Calculate the percentage position of the cursor
-          const percentX = offsetX / rect.width;
-          const percentY = offsetY / rect.height;
-
+        const container = mainContainerRef.current;
+        const content = contentWrapperRef.current;
+        if (!container || !content) {
           setZoom(newZoom);
-
-          // Adjust scroll position after zoom to keep cursor focused
-          // We need to wait for the render cycle to update the scale
-          requestAnimationFrame(() => {
-            if (mainContainerRef.current && contentWrapperRef.current) {
-              const newRect = contentWrapperRef.current.getBoundingClientRect();
-              const newScrollLeft = mainContainerRef.current.scrollLeft + (newRect.width * percentX) - offsetX;
-              const newScrollTop = mainContainerRef.current.scrollTop + (newRect.height * percentY) - offsetY;
-
-              mainContainerRef.current.scrollLeft = newScrollLeft;
-              mainContainerRef.current.scrollTop = newScrollTop;
-            }
-          });
-        } else {
-          setZoom(newZoom);
+          return;
         }
+
+        // Anchor scroll to cursor position so zoom feels like MS Office
+        // cursor position relative to the scrollable content (before zoom)
+        const cursorX = e.clientX - container.getBoundingClientRect().left + container.scrollLeft;
+        const cursorY = e.clientY - container.getBoundingClientRect().top + container.scrollTop;
+
+        const oldZoom = zoom / 100;
+        const newZoomFactor = newZoom / 100;
+
+        setZoom(newZoom);
+
+        requestAnimationFrame(() => {
+          if (!container) return;
+          // Re-anchor: after zoom, scroll so cursor stays over same document point
+          container.scrollLeft = (cursorX / oldZoom) * newZoomFactor - (e.clientX - container.getBoundingClientRect().left);
+          container.scrollTop = (cursorY / oldZoom) * newZoomFactor - (e.clientY - container.getBoundingClientRect().top);
+        });
       }
     };
 
@@ -280,11 +278,8 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
     if (container) {
       container.addEventListener('wheel', handleWheel, { passive: false });
     }
-
     return () => {
-      if (container) {
-        container.removeEventListener('wheel', handleWheel);
-      }
+      if (container) container.removeEventListener('wheel', handleWheel);
     };
   }, [zoom, setZoom]);
 
@@ -460,29 +455,26 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
             )}
 
             {viewMode === 'split' ? (
-              // Split View — physical sizing wrapper so horizontal scroll works
+              // Split View — MS Office style: CSS zoom expands layout naturally in all directions
               <div
                 style={{
-                  // This div expands the scrollable area proportionally to zoom
-                  minWidth: zoom > 100 ? `${zoom}%` : '100%',
-                  minHeight: zoom > 100 ? `${zoom}%` : '100%',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'flex-start',
                   padding: '8px 32px',
                   boxSizing: 'border-box',
+                  minWidth: 'fit-content',
+                  minHeight: '100%',
                 }}
               >
                 <div
                   ref={contentWrapperRef}
                   className={`transition-opacity duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                   style={{
-                    transform: `scale(${zoom / 100})`,
-                    transformOrigin: 'top center',
-                    // counter-scale the width so the outer sizing div handles the actual space
-                    width: zoom !== 100 ? `${(100 / zoom) * 100}%` : '100%',
-                    flexShrink: 0,
-                  }}
+                    // CSS zoom: expands actual DOM layout (unlike transform:scale),
+                    // so scroll works correctly in every direction — portrait & landscape
+                    zoom: zoom / 100,
+                  } as React.CSSProperties}
                 >
                   <div className="split-view-container flex gap-4">
                     {/* First panel - starts from page 1 */}
@@ -530,27 +522,25 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
                 </div>
               </div>
             ) : (
-              // Normal View — physical sizing wrapper so horizontal scroll works at any zoom
+              // Normal View — MS Office style zoom using CSS zoom property
               <div
                 style={{
-                  minWidth: zoom > 100 ? `${zoom}%` : '100%',
-                  minHeight: zoom > 100 ? `${zoom}%` : '100%',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'flex-start',
                   padding: viewMode === 'print' ? '32px' : '8px 32px',
                   boxSizing: 'border-box',
+                  minWidth: 'fit-content',
+                  minHeight: '100%',
                 }}
               >
                 <div
                   ref={contentWrapperRef}
                   className={`transition-opacity duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                   style={{
-                    transform: `scale(${zoom / 100})`,
-                    transformOrigin: 'top center',
-                    width: zoom !== 100 ? `${(100 / zoom) * 100}%` : '100%',
-                    flexShrink: 0,
-                  }}
+                    // CSS zoom: actual layout expansion — portrait & landscape both scroll correctly
+                    zoom: zoom / 100,
+                  } as React.CSSProperties}
                 >
                   <div
                     ref={docxContainerRef}
