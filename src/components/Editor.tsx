@@ -439,10 +439,12 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
           <div
             ref={mainContainerRef as any}
             className={`
-              flex-1 overflow-y-auto p-2 md:p-8 custom-scrollbar flex justify-center 
+              flex-1 overflow-auto custom-scrollbar
               ${isResizingFootnote ? 'transition-none' : 'transition-all duration-300 ease-in-out'}
             `}
+            style={{ position: 'relative' }}
           >
+            {/* Fixed-position overlays (loading/error) centered in the viewport */}
             {isRendering && (
               <div className="flex flex-col items-center justify-center h-64 w-full animate-fadeIn">
                 <span className="material-icons-outlined text-4xl text-primary animate-spin mb-2">refresh</span>
@@ -458,76 +460,106 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
             )}
 
             {viewMode === 'split' ? (
-              // Split View - Two pages side by side
+              // Split View — physical sizing wrapper so horizontal scroll works
               <div
-                ref={contentWrapperRef}
-                className={`transition-transform duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                 style={{
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'center top'
+                  // This div expands the scrollable area proportionally to zoom
+                  minWidth: zoom > 100 ? `${zoom}%` : '100%',
+                  minHeight: zoom > 100 ? `${zoom}%` : '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: '8px 32px',
+                  boxSizing: 'border-box',
                 }}
               >
-                <div className="split-view-container flex gap-4">
-                  {/* First panel - starts from page 1 */}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-center mb-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Page 1</span>
-                    </div>
-                    <div
-                      ref={docxContainerRef}
-                      className="split-layout-view w-full transition-colors duration-300"
-                      style={{
-                        '--docx-background': state.paper.backgroundColor
-                      } as React.CSSProperties}
-                    />
-                  </div>
-                  {/* Second panel - starts from page offset */}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSplitPageOffset(Math.max(1, splitPageOffset - 1))}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
-                          disabled={splitPageOffset <= 1}
-                        >
-                          <span className="material-icons-outlined text-sm">chevron_left</span>
-                        </button>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">Page {splitPageOffset}</span>
-                        <button
-                          onClick={() => setSplitPageOffset(splitPageOffset + 1)}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
-                        >
-                          <span className="material-icons-outlined text-sm">chevron_right</span>
-                        </button>
+                <div
+                  ref={contentWrapperRef}
+                  className={`transition-opacity duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
+                  style={{
+                    transform: `scale(${zoom / 100})`,
+                    transformOrigin: 'top center',
+                    // counter-scale the width so the outer sizing div handles the actual space
+                    width: zoom !== 100 ? `${(100 / zoom) * 100}%` : '100%',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div className="split-view-container flex gap-4">
+                    {/* First panel - starts from page 1 */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-center mb-2">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Page 1</span>
                       </div>
+                      <div
+                        ref={docxContainerRef}
+                        className="split-layout-view w-full transition-colors duration-300"
+                        style={{
+                          '--docx-background': state.paper.backgroundColor
+                        } as React.CSSProperties}
+                      />
                     </div>
-                    <div
-                      ref={docxContainerRef2}
-                      className="split-layout-view w-full transition-colors duration-300"
-                      style={{
-                        '--docx-background': state.paper.backgroundColor
-                      } as React.CSSProperties}
-                    />
+                    {/* Second panel - starts from page offset */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSplitPageOffset(Math.max(1, splitPageOffset - 1))}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                            disabled={splitPageOffset <= 1}
+                          >
+                            <span className="material-icons-outlined text-sm">chevron_left</span>
+                          </button>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">Page {splitPageOffset}</span>
+                          <button
+                            onClick={() => setSplitPageOffset(splitPageOffset + 1)}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                          >
+                            <span className="material-icons-outlined text-sm">chevron_right</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        ref={docxContainerRef2}
+                        className="split-layout-view w-full transition-colors duration-300"
+                        style={{
+                          '--docx-background': state.paper.backgroundColor
+                        } as React.CSSProperties}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
-              // Normal View - Single container
+              // Normal View — physical sizing wrapper so horizontal scroll works at any zoom
               <div
-                ref={contentWrapperRef}
-                className={`transition-transform duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'} ${viewMode === 'print' ? 'origin-center' : 'origin-top'}`}
                 style={{
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: viewMode === 'print' ? 'center top' : 'center top'
+                  minWidth: zoom > 100 ? `${zoom}%` : '100%',
+                  minHeight: zoom > 100 ? `${zoom}%` : '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: viewMode === 'print' ? '32px' : '8px 32px',
+                  boxSizing: 'border-box',
                 }}
               >
                 <div
-                  ref={docxContainerRef}
-                  className={`w-full transition-colors duration-300 ${viewMode === 'print' ? 'max-w-5xl print-layout-view' : 'web-layout-view'}`}
+                  ref={contentWrapperRef}
+                  className={`transition-opacity duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                   style={{
-                    '--docx-background': state.paper.backgroundColor
-                  } as React.CSSProperties}
-                />
+                    transform: `scale(${zoom / 100})`,
+                    transformOrigin: 'top center',
+                    width: zoom !== 100 ? `${(100 / zoom) * 100}%` : '100%',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    ref={docxContainerRef}
+                    className={`w-full transition-colors duration-300 ${viewMode === 'print' ? 'max-w-5xl print-layout-view' : 'web-layout-view'}`}
+                    style={{
+                      '--docx-background': state.paper.backgroundColor
+                    } as React.CSSProperties}
+                  />
+                </div>
               </div>
             )}
           </div>
