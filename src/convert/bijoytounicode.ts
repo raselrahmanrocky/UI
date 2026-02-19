@@ -271,9 +271,103 @@ function isLikelyBijoy(text: string): boolean {
 }
 
 /**
+ * Extracts a map of styleId → font name from styles.xml.
+ * Also extracts the document default font.
+ * Returns: { styleId: fontName, '__docDefault__': fontName }
+ */
+export function extractFontStyleMap(stylesXmlText: string): Record<string, string> {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(stylesXmlText, 'application/xml');
+    const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+    const getWAttr = (el: Element, name: string) => {
+        return el.getAttribute(`w:${name}`) || el.getAttribute(name) || el.getAttributeNS(ns, name);
+    };
+
+    const isSutonnyFont = (val: string | null) => {
+        if (!val) return false;
+        const lower = val.toLowerCase();
+        return lower.includes('sutonny') || lower.includes('suttony') || lower.includes('bijoy');
+    };
+
+    const fontMap: Record<string, string> = {};
+
+    // 1. Extract document defaults (w:docDefaults > w:rPrDefault > w:rFonts)
+    const docDefaults = xmlDoc.getElementsByTagName('w:docDefaults');
+    if (docDefaults.length > 0) {
+        const rPrDefaults = docDefaults[0].getElementsByTagName('w:rPrDefault');
+        if (rPrDefaults.length > 0) {
+            const rFontsNodes = rPrDefaults[0].getElementsByTagName('w:rFonts');
+            if (rFontsNodes.length > 0) {
+                const rf = rFontsNodes[0];
+                const fontAttrs = ['ascii', 'hAnsi', 'cs', 'eastAsia'];
+                for (const attr of fontAttrs) {
+                    const val = getWAttr(rf, attr);
+                    if (isSutonnyFont(val)) {
+                        fontMap['__docDefault__'] = val!;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Extract per-style fonts (w:style > w:rPr > w:rFonts)
+    const styles = xmlDoc.getElementsByTagName('w:style');
+    for (let i = 0; i < styles.length; i++) {
+        const style = styles[i];
+        const styleId = getWAttr(style, 'styleId');
+        if (!styleId) continue;
+
+        const rPrNodes = style.getElementsByTagName('w:rPr');
+        if (rPrNodes.length > 0) {
+            const rFontsNodes = rPrNodes[0].getElementsByTagName('w:rFonts');
+            if (rFontsNodes.length > 0) {
+                const rf = rFontsNodes[0];
+                const fontAttrs = ['ascii', 'hAnsi', 'cs', 'eastAsia'];
+                for (const attr of fontAttrs) {
+                    const val = getWAttr(rf, attr);
+                    if (isSutonnyFont(val)) {
+                        fontMap[styleId] = val!;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Also check w:pPr > w:rPr > w:rFonts for paragraph style defaults
+        const pPrNodes = style.getElementsByTagName('w:pPr');
+        if (pPrNodes.length > 0) {
+            const rPrInPPr = pPrNodes[0].getElementsByTagName('w:rPr');
+            if (rPrInPPr.length > 0) {
+                const rFontsNodes = rPrInPPr[0].getElementsByTagName('w:rFonts');
+                if (rFontsNodes.length > 0) {
+                    const rf = rFontsNodes[0];
+                    const fontAttrs = ['ascii', 'hAnsi', 'cs', 'eastAsia'];
+                    for (const attr of fontAttrs) {
+                        const val = getWAttr(rf, attr);
+                        if (!fontMap[styleId] && isSutonnyFont(val)) {
+                            fontMap[styleId] = val!;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return fontMap;
+}
+
+/**
  * Robust surgical converter for Word 2007 (Docx) 
  */
-export function convertXmlDocument(xmlText: string, isStyleFile: boolean = false, forceConvert: boolean = false): string {
+export function convertXmlDocument(
+    xmlText: string,
+    isStyleFile: boolean = false,
+    forceConvert: boolean = false,
+    fontStyleMap: Record<string, string> = {}
+): string {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
     const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -324,6 +418,7 @@ export function convertXmlDocument(xmlText: string, isStyleFile: boolean = false
         // Run-level decision based on Font and Content
         let isSutonny = false;
         let isKnownEnglish = false;
+        let hasExplicitNonSutonnyFont = false; // Track if a non-Sutonny font is explicitly set
 
         const rPrs = getNodes(run, 'rPr');
 
@@ -339,6 +434,10 @@ export function convertXmlDocument(xmlText: string, isStyleFile: boolean = false
             }
             if (IGNORED_FONTS.some(ignored => lowerVal.includes(ignored))) {
                 isKnownEnglish = true;
+            }
+            // If a font is explicitly specified but it's NOT Sutonny and NOT a known English font
+            if (!isSutonny && !IGNORED_FONTS.some(ignored => lowerVal.includes(ignored))) {
+                hasExplicitNonSutonnyFont = true;
             }
         };
 
@@ -357,12 +456,41 @@ export function convertXmlDocument(xmlText: string, isStyleFile: boolean = false
             if (pStyle) checkFontVal(getWAttr(pStyle, 'val'));
         }
 
+        // --- MS Office 2007 Inherited Font Detection ---
+        // If still not detected, check fontStyleMap (from styles.xml) for inherited fonts.
+        // This covers documents where font is defined at style/default level, not per-run.
+        if (!isSutonny && !isKnownEnglish && Object.keys(fontStyleMap).length > 0) {
+            // Check paragraph style inheritance
+            const pStyleId = pStyle ? getWAttr(pStyle, 'val') : null;
+            if (pStyleId && fontStyleMap[pStyleId]) {
+                checkFontVal(fontStyleMap[pStyleId]);
+            }
+
+            // Check run style inheritance
+            const rStyleId = rStyle ? getWAttr(rStyle, 'val') : null;
+            if (!isSutonny && rStyleId && fontStyleMap[rStyleId]) {
+                checkFontVal(fontStyleMap[rStyleId]);
+            }
+
+            // Check document default font (last resort)
+            if (!isSutonny && fontStyleMap['__docDefault__']) {
+                checkFontVal(fontStyleMap['__docDefault__']);
+            }
+        }
+
         // Decision logic:
         // 1. Explicit SutonnyMJ -> Convert.
-        // 2. Explicit English -> Skip.
-        // 3. Fallback (forceConvert) -> Convert only if it passes heuristic.
+        // 2. Explicit non-SutonnyMJ font (other font like Arial, etc.) -> Skip (NEVER convert).
+        // 3. Explicit English font -> Skip.
+        // 4. Fallback (forceConvert) -> Convert only if no explicit font was specified.
         let shouldConvertRecord = isSutonny;
-        if (!isSutonny && !isKnownEnglish && forceConvert) {
+
+        // If a non-Sutonny font is explicitly specified, NEVER convert (even with Force Convert)
+        if (hasExplicitNonSutonnyFont) {
+            shouldConvertRecord = false;
+        }
+        // Only apply Force Convert when no explicit font is specified (unknown font)
+        else if (!isSutonny && !isKnownEnglish && forceConvert) {
             shouldConvertRecord = true;
         }
 
