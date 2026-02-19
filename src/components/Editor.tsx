@@ -46,6 +46,9 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
   const [totalPages, setTotalPages] = useState(0);
   const pagesRef = useRef<NodeListOf<Element> | null>(null);
 
+  // Ref to suppress zoom transition during wheel zoom (avoids shake/jitter)
+  const wheelZoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   // Mobile Detection
   const [isMobile, setIsMobile] = useState(false);
@@ -196,12 +199,20 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
       } else if (e.key === 'End') {
         e.preventDefault();
         scrollToPage(totalPages);
+      } else if (e.key === '+' || e.key === '=') {
+        // Zoom In shortcut (+/=) — smooth transition, document stays centered via justifyContent
+        e.preventDefault();
+        setZoom(Math.min(zoom + 10, 200));
+      } else if (e.key === '-') {
+        // Zoom Out shortcut (-) — smooth transition, document stays centered via justifyContent
+        e.preventDefault();
+        setZoom(Math.max(zoom - 10, 50));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToPrevPage, goToNextPage, scrollToPage, totalPages]);
+  }, [goToPrevPage, goToNextPage, scrollToPage, totalPages, setZoom]);
 
   // Track current visible page on scroll
   useEffect(() => {
@@ -238,7 +249,7 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
     return () => container.removeEventListener('scroll', handleScroll);
   }, [file, onStatsUpdate]);
 
-  // Mouse wheel zoom handler — MS Office style (CSS zoom, cursor-anchored)
+  // Mouse wheel zoom handler — MS Office style (CSS zoom, cursor-anchored, no transition to avoid shake)
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
@@ -254,6 +265,12 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
           setZoom(newZoom);
           return;
         }
+
+        // Disable zoom transition during wheel zoom to prevent shake/jitter
+        content.style.transition = 'none';
+
+        // Clear any pending debounce that would restore transition
+        if (wheelZoomDebounceRef.current) clearTimeout(wheelZoomDebounceRef.current);
 
         // Anchor scroll to cursor position so zoom feels like MS Office
         // cursor position relative to the scrollable content (before zoom)
@@ -271,6 +288,11 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
           container.scrollLeft = (cursorX / oldZoom) * newZoomFactor - (e.clientX - container.getBoundingClientRect().left);
           container.scrollTop = (cursorY / oldZoom) * newZoomFactor - (e.clientY - container.getBoundingClientRect().top);
         });
+
+        // Restore smooth transition after wheel stops (200ms debounce)
+        wheelZoomDebounceRef.current = setTimeout(() => {
+          if (content) content.style.transition = 'zoom 150ms ease-out';
+        }, 200);
       }
     };
 
@@ -474,6 +496,8 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
                     // CSS zoom: expands actual DOM layout (unlike transform:scale),
                     // so scroll works correctly in every direction — portrait & landscape
                     zoom: zoom / 100,
+                    transition: 'zoom 150ms ease-out',
+                    margin: '0 auto',
                   } as React.CSSProperties}
                 >
                   <div className="split-view-container flex gap-4">
@@ -523,6 +547,8 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
               </div>
             ) : (
               // Normal View — MS Office style zoom using CSS zoom property
+              // Using display:block + margin:0 auto instead of flex+justifyContent:center
+              // so that wide landscape documents can be scrolled left (flex center clips left overflow)
               <div
                 style={{
                   display: 'flex',
@@ -540,6 +566,8 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
                   style={{
                     // CSS zoom: actual layout expansion — portrait & landscape both scroll correctly
                     zoom: zoom / 100,
+                    transition: 'zoom 150ms ease-out',
+                    margin: '0 auto',
                   } as React.CSSProperties}
                 >
                   <div
