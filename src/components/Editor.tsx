@@ -14,13 +14,14 @@ interface EditorProps {
   files: FileState[];
   currentIndex: number;
   onSelectFile: (index: number) => void;
+  onConvertFile?: (index: number) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
   viewMode: ViewMode;
   onStatsUpdate: (stats: DocumentStats) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
+export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, onConvertFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
   const currentFileState = currentIndex >= 0 && currentIndex < files.length ? files[currentIndex] : null;
   // Use converted file if available, otherwise use original
   const file = currentFileState?.convertedFile || currentFileState?.file || null;
@@ -40,6 +41,7 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
   const [footnotePanelWidth, setFootnotePanelWidth] = useState(320);
   const [isResizingFootnote, setIsResizingFootnote] = useState(false);
   const resizeRef = useRef({ startX: 0, startWidth: 0 });
+  const [showConvertPopup, setShowConvertPopup] = useState(false);
 
   // Page Navigation State
   const [currentPage, setCurrentPage] = useState(1);
@@ -380,48 +382,46 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
                 <span className="hidden sm:inline">{showFootnotePanel ? 'Hide Footnotes' : 'Show Footnotes'}</span>
               </button>
             )}
-          </div>
 
-          {/* Page Navigation */}
-          {totalPages > 0 && (
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5">
-              <button
-                onClick={goToPrevPage}
-                disabled={currentPage <= 1}
-                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
-                title="Previous Page (PageUp)"
-              >
-                <span className="material-icons-outlined text-sm">chevron_left</span>
-              </button>
-
-              <div className="flex items-center gap-1.5 min-w-[100px] justify-center">
-                <input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={currentPage}
-                  onChange={(e) => {
-                    const page = parseInt(e.target.value);
-                    if (!isNaN(page) && page >= 1 && page <= totalPages) {
-                      scrollToPage(page);
-                    }
-                  }}
-                  className="w-12 text-center text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                  title="Go to page"
-                />
-                <span className="text-xs text-slate-500 dark:text-slate-400">of {totalPages}</span>
+            {/* Mobile Convert Button & Popup */}
+            {onConvertFile && currentFileState && currentFileState.status !== 'converted' && (
+              <div className="relative md:hidden">
+                <button
+                  onClick={() => setShowConvertPopup(!showConvertPopup)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded shadow-sm bg-primary hover:bg-blue-600 text-white text-sm font-medium transition-all duration-200"
+                  title="Convert File"
+                >
+                  <span className="material-icons-outlined text-sm">transform</span>
+                  <span>Convert</span>
+                </button>
+                {/* Convert Popup */}
+                {showConvertPopup && (
+                  <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-2 z-50 animate-fadeIn">
+                    <button
+                      onClick={() => {
+                        onConvertFile(currentIndex);
+                        setShowConvertPopup(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-icons-outlined text-lg">text_fields</span>
+                      Unicode to Bijoy
+                    </button>
+                    <button
+                      onClick={() => {
+                        onConvertFile(currentIndex);
+                        setShowConvertPopup(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-icons-outlined text-lg">format_shapes</span>
+                      Bijoy to Unicode
+                    </button>
+                  </div>
+                )}
               </div>
-
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
-                title="Next Page (PageDown)"
-              >
-                <span className="material-icons-outlined text-sm">chevron_right</span>
-              </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* File Navigation */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
