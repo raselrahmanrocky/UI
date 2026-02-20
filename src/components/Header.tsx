@@ -155,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => fileInputRef.current?.click()}
           title="Open DOCX File"
         >
-          <span className="material-icons-outlined text-xl">folder_open</span>
+          <span className="material-icons-outlined text-xl">upload_file</span>
         </button>
 
         {/* Mobile File Sidebar Toggle */}
@@ -163,13 +163,33 @@ export const Header: React.FC<HeaderProps> = ({
           className="md:hidden p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors relative"
           onClick={onToggleFileSidebar}
         >
-          <span className="material-icons-outlined">folder_copy</span>
+          <span className="material-icons-outlined">file_present</span>
           {totalFiles > 0 && (
             <span className="absolute -top-1 -right-1 bg-primary text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
               {totalFiles}
             </span>
           )}
         </button>
+
+        {/* Mobile Undo/Redo */}
+        <div className="md:hidden flex items-center">
+          <button
+            className={`p-1.5 rounded transition-all duration-200 ${canUndo ? 'text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
+            onClick={onUndo}
+            disabled={!canUndo}
+            title={canUndo ? "Undo" : "Nothing to undo"}
+          >
+            <span className="material-icons-outlined text-xl">undo</span>
+          </button>
+          <button
+            className={`p-1.5 rounded transition-all duration-200 ${canRedo ? 'text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'}`}
+            onClick={onRedo}
+            disabled={!canRedo}
+            title={canRedo ? "Redo" : "Nothing to redo"}
+          >
+            <span className="material-icons-outlined text-xl">redo</span>
+          </button>
+        </div>
 
         {/* UI Theme Switcher (Light/Dark Mode) */}
         <div className="relative" ref={themeMenuRef}>
