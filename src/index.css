@@ -141,3 +141,12 @@ select,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
     0 4px 16px rgba(0, 0, 0, 0.2) !important;
 }
+
+.docx_viewer-wrapper>section.docx_viewer {
+  overflow-x: visible;
+  overflow-y: visible;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  margin: auto;
+}
