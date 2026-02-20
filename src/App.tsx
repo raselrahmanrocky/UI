@@ -181,7 +181,7 @@ const App: React.FC = () => {
     setCurrentFileIndex(newIndex);
   };
 
-  // Handle file conversion status update
+  // Handle file conversion status update - with history tracking
   const handleFileConverted = async (index: number, convertedFile: File) => {
     // Save to IndexedDB history (persistent storage)
     const originalFile = uploadedFiles[index]?.file;
@@ -193,16 +193,23 @@ const App: React.FC = () => {
       }
     }
 
-    // Create new array with updated file - using functional update to get latest state
-    setUploadedFiles(prevFiles => {
-      const newFiles = [...prevFiles];
-      newFiles[index] = {
-        ...newFiles[index],
-        status: 'converted',
-        convertedFile
-      };
-      return newFiles;
-    });
+    // Create new array with updated file
+    const newFiles = [...uploadedFiles];
+    newFiles[index] = {
+      ...newFiles[index],
+      status: 'converted',
+      convertedFile
+    };
+
+    // Add to history - this creates a new history entry for each file conversion
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: newFiles,
+      currentFileIndex
+    };
+    addToHistory(newAppState);
+
+    setUploadedFiles(newFiles);
   };
 
   // Handle file conversion error - with history tracking
