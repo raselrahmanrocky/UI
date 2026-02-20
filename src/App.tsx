@@ -33,6 +33,7 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [isMobileFileSidebarOpen, setIsMobileFileSidebarOpen] = useState(false);
+  const [convertRequestTrigger, setConvertRequestTrigger] = useState(0);
   const [uiTheme, setUiTheme] = useState<UITheme>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('ui-theme') as UITheme) || 'system';
@@ -43,6 +44,11 @@ const App: React.FC = () => {
   // Unified Undo/Redo History State - tracks entire app state
   const [history, setHistory] = useState<AppState[]>([createInitialState()]);
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Handle convert request from Editor (mobile convert button)
+  const handleConvertRequest = () => {
+    setConvertRequestTrigger(prev => prev + 1);
+  };
 
   // Computed values for undo/redo availability
   const canUndo = historyIndex > 0;
@@ -181,7 +187,7 @@ const App: React.FC = () => {
     setCurrentFileIndex(newIndex);
   };
 
-  // Handle file conversion status update
+  // Handle file conversion status update - with history tracking
   const handleFileConverted = async (index: number, convertedFile: File) => {
     // Save to IndexedDB history (persistent storage)
     const originalFile = uploadedFiles[index]?.file;
@@ -193,16 +199,23 @@ const App: React.FC = () => {
       }
     }
 
-    // Create new array with updated file - using functional update to get latest state
-    setUploadedFiles(prevFiles => {
-      const newFiles = [...prevFiles];
-      newFiles[index] = {
-        ...newFiles[index],
-        status: 'converted',
-        convertedFile
-      };
-      return newFiles;
-    });
+    // Create new array with updated file
+    const newFiles = [...uploadedFiles];
+    newFiles[index] = {
+      ...newFiles[index],
+      status: 'converted',
+      convertedFile
+    };
+
+    // Add to history - this creates a new history entry for each file conversion
+    const newAppState: AppState = {
+      documentState,
+      uploadedFiles: newFiles,
+      currentFileIndex
+    };
+    addToHistory(newAppState);
+
+    setUploadedFiles(newFiles);
   };
 
   // Handle file conversion error - with history tracking
@@ -276,12 +289,14 @@ const App: React.FC = () => {
           onClearAllFiles={handleClearAllFiles}
           isMobileOpen={isMobileFileSidebarOpen}
           onMobileClose={() => setIsMobileFileSidebarOpen(false)}
+          convertTrigger={convertRequestTrigger}
         />
         <Editor
           state={documentState}
           files={uploadedFiles}
           currentIndex={currentFileIndex}
           onSelectFile={handleSelectFile}
+          onConvertFile={handleConvertRequest}
           zoom={zoom}
           setZoom={setZoom}
           viewMode={viewMode}

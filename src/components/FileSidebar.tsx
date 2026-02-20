@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileState } from '../types';
 import JSZip from 'jszip';
-import { convertXmlDocument } from '../convert/bijoytounicode';
+import { convertXmlDocument, extractFontStyleMap } from '../convert/bijoytounicode';
 import { convertXmlDocumentToBijoy } from '../convert/unicodetobijoy';
 
 interface FileSidebarProps {
@@ -15,6 +15,7 @@ interface FileSidebarProps {
   onClearAllFiles: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
+  convertTrigger?: number;
 }
 
 export const FileSidebar: React.FC<FileSidebarProps> = ({
@@ -27,7 +28,8 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   onFileError,
   onClearAllFiles,
   isMobileOpen,
-  onMobileClose
+  onMobileClose,
+  convertTrigger
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [convertingIndex, setConvertingIndex] = useState<number | null>(null);
@@ -37,6 +39,16 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   const [convertingCurrent, setConvertingCurrent] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Handle external convert request
+  useEffect(() => {
+    if (convertTrigger && currentIndex >= 0 && currentIndex < files.length) {
+      const fileState = files[currentIndex];
+      if (fileState && fileState.status !== 'converted' && fileState.status !== 'converting') {
+        convertFile(fileState, currentIndex);
+      }
+    }
+  }, [convertTrigger, currentIndex]);
 
   // Check if any conversion is in progress
   const isConverting = convertingIndex !== null || convertingTotal > 0;
@@ -56,6 +68,20 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
         path.startsWith('word/') && path.endsWith('.xml')
       );
 
+      // --- MS Office 2007 Fix: Pre-build font style map from styles.xml ---
+      // This allows detecting fonts inherited from styles (not explicitly set per-run).
+      let fontStyleMap: Record<string, string> = {};
+      if (conversionType === 'legacyToUnicode') {
+        const stylesPath = xmlFiles.find(p => p.endsWith('styles.xml'));
+        if (stylesPath) {
+          const stylesFile = content.file(stylesPath);
+          if (stylesFile) {
+            const stylesXmlText = await stylesFile.async('string');
+            fontStyleMap = extractFontStyleMap(stylesXmlText);
+          }
+        }
+      }
+
       for (const path of xmlFiles) {
         const xmlFile = content.file(path);
         if (xmlFile) {
@@ -63,8 +89,8 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
           let convertedXml: string;
 
           if (conversionType === 'legacyToUnicode') {
-            const isStyleFile = path.includes('styles.xml');
-            convertedXml = convertXmlDocument(xmlText, isStyleFile, forceConvert);
+            const isStyleFile = path.endsWith('styles.xml');
+            convertedXml = convertXmlDocument(xmlText, isStyleFile, forceConvert, fontStyleMap);
           } else {
             convertedXml = convertXmlDocumentToBijoy(xmlText);
           }
@@ -254,7 +280,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                 <div className="flex bg-slate-100 dark:bg-slate-900 rounded p-1">
                   <button
                     onClick={() => setConversionType('legacyToUnicode')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${conversionType === 'legacyToUnicode'
+                    className={`flex-1 py-1.5 text-sm font-medium rounded transition-all duration-200 ${conversionType === 'legacyToUnicode'
                       ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
                       : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                       }`}
@@ -263,7 +289,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
                   </button>
                   <button
                     onClick={() => setConversionType('unicodeToLegacy')}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded transition-all duration-200 ${conversionType === 'unicodeToLegacy'
+                    className={`flex-1 py-1.5 text-sm font-medium rounded transition-all duration-200 ${conversionType === 'unicodeToLegacy'
                       ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
                       : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                       }`}

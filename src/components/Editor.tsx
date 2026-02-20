@@ -14,13 +14,14 @@ interface EditorProps {
   files: FileState[];
   currentIndex: number;
   onSelectFile: (index: number) => void;
+  onConvertFile?: (index: number) => void;
   zoom: number;
   setZoom: (zoom: number) => void;
   viewMode: ViewMode;
   onStatsUpdate: (stats: DocumentStats) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
+export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, onConvertFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
   const currentFileState = currentIndex >= 0 && currentIndex < files.length ? files[currentIndex] : null;
   // Use converted file if available, otherwise use original
   const file = currentFileState?.convertedFile || currentFileState?.file || null;
@@ -40,11 +41,15 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
   const [footnotePanelWidth, setFootnotePanelWidth] = useState(320);
   const [isResizingFootnote, setIsResizingFootnote] = useState(false);
   const resizeRef = useRef({ startX: 0, startWidth: 0 });
+  const [showConvertPopup, setShowConvertPopup] = useState(false);
 
   // Page Navigation State
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const pagesRef = useRef<NodeListOf<Element> | null>(null);
+
+  // Ref to suppress zoom transition during wheel zoom (avoids shake/jitter)
+  const wheelZoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
   // Mobile Detection
@@ -196,12 +201,20 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
       } else if (e.key === 'End') {
         e.preventDefault();
         scrollToPage(totalPages);
+      } else if (e.key === '+' || e.key === '=') {
+        // Zoom In shortcut (+/=) — smooth transition, document stays centered via justifyContent
+        e.preventDefault();
+        setZoom(Math.min(zoom + 10, 200));
+      } else if (e.key === '-') {
+        // Zoom Out shortcut (-) — smooth transition, document stays centered via justifyContent
+        e.preventDefault();
+        setZoom(Math.max(zoom - 10, 50));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToPrevPage, goToNextPage, scrollToPage, totalPages]);
+  }, [goToPrevPage, goToNextPage, scrollToPage, totalPages, setZoom]);
 
   // Track current visible page on scroll
   useEffect(() => {
@@ -238,41 +251,50 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
     return () => container.removeEventListener('scroll', handleScroll);
   }, [file, onStatsUpdate]);
 
-  // Mouse wheel zoom handler with cursor focus
+  // Mouse wheel zoom handler — MS Office style (CSS zoom, cursor-anchored, no transition to avoid shake)
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
+
         const delta = e.deltaY > 0 ? -10 : 10;
         const newZoom = Math.min(Math.max(zoom + delta, 50), 200);
+        if (newZoom === zoom) return;
 
-        if (newZoom !== zoom && mainContainerRef.current && contentWrapperRef.current) {
-          // Calculate cursor position relative to the content
-          const rect = contentWrapperRef.current.getBoundingClientRect();
-          const offsetX = e.clientX - rect.left;
-          const offsetY = e.clientY - rect.top;
-
-          // Calculate the percentage position of the cursor
-          const percentX = offsetX / rect.width;
-          const percentY = offsetY / rect.height;
-
+        const container = mainContainerRef.current;
+        const content = contentWrapperRef.current;
+        if (!container || !content) {
           setZoom(newZoom);
-
-          // Adjust scroll position after zoom to keep cursor focused
-          // We need to wait for the render cycle to update the scale
-          requestAnimationFrame(() => {
-            if (mainContainerRef.current && contentWrapperRef.current) {
-              const newRect = contentWrapperRef.current.getBoundingClientRect();
-              const newScrollLeft = mainContainerRef.current.scrollLeft + (newRect.width * percentX) - offsetX;
-              const newScrollTop = mainContainerRef.current.scrollTop + (newRect.height * percentY) - offsetY;
-
-              mainContainerRef.current.scrollLeft = newScrollLeft;
-              mainContainerRef.current.scrollTop = newScrollTop;
-            }
-          });
-        } else {
-          setZoom(newZoom);
+          return;
         }
+
+        // Disable zoom transition during wheel zoom to prevent shake/jitter
+        content.style.transition = 'none';
+
+        // Clear any pending debounce that would restore transition
+        if (wheelZoomDebounceRef.current) clearTimeout(wheelZoomDebounceRef.current);
+
+        // Anchor scroll to cursor position so zoom feels like MS Office
+        // cursor position relative to the scrollable content (before zoom)
+        const cursorX = e.clientX - container.getBoundingClientRect().left + container.scrollLeft;
+        const cursorY = e.clientY - container.getBoundingClientRect().top + container.scrollTop;
+
+        const oldZoom = zoom / 100;
+        const newZoomFactor = newZoom / 100;
+
+        setZoom(newZoom);
+
+        requestAnimationFrame(() => {
+          if (!container) return;
+          // Re-anchor: after zoom, scroll so cursor stays over same document point
+          container.scrollLeft = (cursorX / oldZoom) * newZoomFactor - (e.clientX - container.getBoundingClientRect().left);
+          container.scrollTop = (cursorY / oldZoom) * newZoomFactor - (e.clientY - container.getBoundingClientRect().top);
+        });
+
+        // Restore smooth transition after wheel stops (200ms debounce)
+        wheelZoomDebounceRef.current = setTimeout(() => {
+          if (content) content.style.transition = 'zoom 150ms ease-out';
+        }, 200);
       }
     };
 
@@ -280,11 +302,8 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
     if (container) {
       container.addEventListener('wheel', handleWheel, { passive: false });
     }
-
     return () => {
-      if (container) {
-        container.removeEventListener('wheel', handleWheel);
-      }
+      if (container) container.removeEventListener('wheel', handleWheel);
     };
   }, [zoom, setZoom]);
 
@@ -363,48 +382,46 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
                 <span className="hidden sm:inline">{showFootnotePanel ? 'Hide Footnotes' : 'Show Footnotes'}</span>
               </button>
             )}
-          </div>
 
-          {/* Page Navigation */}
-          {totalPages > 0 && (
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5">
-              <button
-                onClick={goToPrevPage}
-                disabled={currentPage <= 1}
-                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
-                title="Previous Page (PageUp)"
-              >
-                <span className="material-icons-outlined text-sm">chevron_left</span>
-              </button>
-
-              <div className="flex items-center gap-1.5 min-w-[100px] justify-center">
-                <input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={currentPage}
-                  onChange={(e) => {
-                    const page = parseInt(e.target.value);
-                    if (!isNaN(page) && page >= 1 && page <= totalPages) {
-                      scrollToPage(page);
-                    }
-                  }}
-                  className="w-12 text-center text-xs font-medium bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary"
-                  title="Go to page"
-                />
-                <span className="text-xs text-slate-500 dark:text-slate-400">of {totalPages}</span>
+            {/* Mobile Convert Button & Popup */}
+            {onConvertFile && currentFileState && currentFileState.status !== 'converted' && (
+              <div className="relative md:hidden">
+                <button
+                  onClick={() => setShowConvertPopup(!showConvertPopup)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded shadow-sm bg-primary hover:bg-blue-600 text-white text-sm font-medium transition-all duration-200"
+                  title="Convert File"
+                >
+                  <span className="material-icons-outlined text-sm">transform</span>
+                  <span>Convert</span>
+                </button>
+                {/* Convert Popup */}
+                {showConvertPopup && (
+                  <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-2 z-50 animate-fadeIn">
+                    <button
+                      onClick={() => {
+                        onConvertFile(currentIndex);
+                        setShowConvertPopup(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-icons-outlined text-lg">text_fields</span>
+                      Unicode to Bijoy
+                    </button>
+                    <button
+                      onClick={() => {
+                        onConvertFile(currentIndex);
+                        setShowConvertPopup(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
+                    >
+                      <span className="material-icons-outlined text-lg">format_shapes</span>
+                      Bijoy to Unicode
+                    </button>
+                  </div>
+                )}
               </div>
-
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-all duration-200"
-                title="Next Page (PageDown)"
-              >
-                <span className="material-icons-outlined text-sm">chevron_right</span>
-              </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* File Navigation */}
           <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2">
@@ -439,10 +456,12 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
           <div
             ref={mainContainerRef as any}
             className={`
-              flex-1 overflow-y-auto p-2 md:p-8 custom-scrollbar flex justify-center 
+              flex-1 overflow-auto custom-scrollbar
               ${isResizingFootnote ? 'transition-none' : 'transition-all duration-300 ease-in-out'}
             `}
+            style={{ position: 'relative' }}
           >
+            {/* Fixed-position overlays (loading/error) centered in the viewport */}
             {isRendering && (
               <div className="flex flex-col items-center justify-center h-64 w-full animate-fadeIn">
                 <span className="material-icons-outlined text-4xl text-primary animate-spin mb-2">refresh</span>
@@ -458,76 +477,107 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
             )}
 
             {viewMode === 'split' ? (
-              // Split View - Two pages side by side
+              // Split View — MS Office style: CSS zoom expands layout naturally in all directions
               <div
-                ref={contentWrapperRef}
-                className={`transition-transform duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                 style={{
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'center top'
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: '8px 32px',
+                  boxSizing: 'border-box',
+                  minWidth: 'fit-content',
+                  minHeight: '100%',
                 }}
               >
-                <div className="split-view-container flex gap-4">
-                  {/* First panel - starts from page 1 */}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-center mb-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Page 1</span>
-                    </div>
-                    <div
-                      ref={docxContainerRef}
-                      className="split-layout-view w-full transition-colors duration-300"
-                      style={{
-                        '--docx-background': state.paper.backgroundColor
-                      } as React.CSSProperties}
-                    />
-                  </div>
-                  {/* Second panel - starts from page offset */}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-center mb-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSplitPageOffset(Math.max(1, splitPageOffset - 1))}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
-                          disabled={splitPageOffset <= 1}
-                        >
-                          <span className="material-icons-outlined text-sm">chevron_left</span>
-                        </button>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">Page {splitPageOffset}</span>
-                        <button
-                          onClick={() => setSplitPageOffset(splitPageOffset + 1)}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
-                        >
-                          <span className="material-icons-outlined text-sm">chevron_right</span>
-                        </button>
+                <div
+                  ref={contentWrapperRef}
+                  className={`transition-opacity duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
+                  style={{
+                    // CSS zoom: expands actual DOM layout (unlike transform:scale),
+                    // so scroll works correctly in every direction — portrait & landscape
+                    zoom: zoom / 100,
+                    transition: 'zoom 150ms ease-out',
+                    margin: '0 auto',
+                  } as React.CSSProperties}
+                >
+                  <div className="split-view-container flex gap-4">
+                    {/* First panel - starts from page 1 */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-center mb-2">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Page 1</span>
                       </div>
+                      <div
+                        ref={docxContainerRef}
+                        className="split-layout-view w-full transition-colors duration-300"
+                        style={{
+                          '--docx-background': state.paper.backgroundColor
+                        } as React.CSSProperties}
+                      />
                     </div>
-                    <div
-                      ref={docxContainerRef2}
-                      className="split-layout-view w-full transition-colors duration-300"
-                      style={{
-                        '--docx-background': state.paper.backgroundColor
-                      } as React.CSSProperties}
-                    />
+                    {/* Second panel - starts from page offset */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex justify-center mb-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSplitPageOffset(Math.max(1, splitPageOffset - 1))}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                            disabled={splitPageOffset <= 1}
+                          >
+                            <span className="material-icons-outlined text-sm">chevron_left</span>
+                          </button>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">Page {splitPageOffset}</span>
+                          <button
+                            onClick={() => setSplitPageOffset(splitPageOffset + 1)}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+                          >
+                            <span className="material-icons-outlined text-sm">chevron_right</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        ref={docxContainerRef2}
+                        className="split-layout-view w-full transition-colors duration-300"
+                        style={{
+                          '--docx-background': state.paper.backgroundColor
+                        } as React.CSSProperties}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
-              // Normal View - Single container
+              // Normal View — MS Office style zoom using CSS zoom property
+              // Using display:block + margin:0 auto instead of flex+justifyContent:center
+              // so that wide landscape documents can be scrolled left (flex center clips left overflow)
               <div
-                ref={contentWrapperRef}
-                className={`transition-transform duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'} ${viewMode === 'print' ? 'origin-center' : 'origin-top'}`}
                 style={{
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: viewMode === 'print' ? 'center top' : 'center top'
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  padding: viewMode === 'print' ? '32px' : '8px 32px',
+                  boxSizing: 'border-box',
+                  minWidth: 'fit-content',
+                  minHeight: '100%',
                 }}
               >
                 <div
-                  ref={docxContainerRef}
-                  className={`w-full transition-colors duration-300 ${viewMode === 'print' ? 'max-w-5xl print-layout-view' : 'web-layout-view'}`}
+                  ref={contentWrapperRef}
+                  className={`transition-opacity duration-200 ease-out ${isRendering ? 'opacity-0' : 'opacity-100'}`}
                   style={{
-                    '--docx-background': state.paper.backgroundColor
+                    // CSS zoom: actual layout expansion — portrait & landscape both scroll correctly
+                    zoom: zoom / 100,
+                    transition: 'zoom 150ms ease-out',
+                    margin: '0 auto',
                   } as React.CSSProperties}
-                />
+                >
+                  <div
+                    ref={docxContainerRef}
+                    className={`w-full transition-colors duration-300 ${viewMode === 'print' ? 'max-w-5xl print-layout-view' : 'web-layout-view'}`}
+                    style={{
+                      '--docx-background': state.paper.backgroundColor
+                    } as React.CSSProperties}
+                  />
+                </div>
               </div>
             )}
           </div>
