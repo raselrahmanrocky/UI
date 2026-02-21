@@ -33,7 +33,6 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [isMobileFileSidebarOpen, setIsMobileFileSidebarOpen] = useState(false);
-  const [convertRequestTrigger, setConvertRequestTrigger] = useState(0);
   const [uiTheme, setUiTheme] = useState<UITheme>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('ui-theme') as UITheme) || 'system';
@@ -44,11 +43,6 @@ const App: React.FC = () => {
   // Unified Undo/Redo History State - tracks entire app state
   const [history, setHistory] = useState<AppState[]>([createInitialState()]);
   const [historyIndex, setHistoryIndex] = useState(0);
-
-  // Handle convert request from Editor (mobile convert button)
-  const handleConvertRequest = () => {
-    setConvertRequestTrigger(prev => prev + 1);
-  };
 
   // Computed values for undo/redo availability
   const canUndo = historyIndex > 0;
@@ -289,14 +283,12 @@ const App: React.FC = () => {
           onClearAllFiles={handleClearAllFiles}
           isMobileOpen={isMobileFileSidebarOpen}
           onMobileClose={() => setIsMobileFileSidebarOpen(false)}
-          convertTrigger={convertRequestTrigger}
         />
         <Editor
           state={documentState}
           files={uploadedFiles}
           currentIndex={currentFileIndex}
           onSelectFile={handleSelectFile}
-          onConvertFile={handleConvertRequest}
           zoom={zoom}
           setZoom={setZoom}
           viewMode={viewMode}
