@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { FileState } from '../types';
 import JSZip from 'jszip';
 import { convertXmlDocument, extractFontStyleMap } from '../convert/bijoytounicode';
@@ -15,7 +15,6 @@ interface FileSidebarProps {
   onClearAllFiles: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
-  convertTrigger?: number;
 }
 
 export const FileSidebar: React.FC<FileSidebarProps> = ({
@@ -28,8 +27,7 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   onFileError,
   onClearAllFiles,
   isMobileOpen,
-  onMobileClose,
-  convertTrigger
+  onMobileClose
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [convertingIndex, setConvertingIndex] = useState<number | null>(null);
@@ -39,16 +37,6 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
   const [convertingCurrent, setConvertingCurrent] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
-
-  // Handle external convert request
-  useEffect(() => {
-    if (convertTrigger && currentIndex >= 0 && currentIndex < files.length) {
-      const fileState = files[currentIndex];
-      if (fileState && fileState.status !== 'converted' && fileState.status !== 'converting') {
-        convertFile(fileState, currentIndex);
-      }
-    }
-  }, [convertTrigger, currentIndex]);
 
   // Check if any conversion is in progress
   const isConverting = convertingIndex !== null || convertingTotal > 0;

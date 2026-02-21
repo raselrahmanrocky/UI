@@ -21,7 +21,7 @@ interface EditorProps {
   onStatsUpdate: (stats: DocumentStats) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, onConvertFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
+export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSelectFile, zoom, setZoom, viewMode, onStatsUpdate }) => {
   const currentFileState = currentIndex >= 0 && currentIndex < files.length ? files[currentIndex] : null;
   // Use converted file if available, otherwise use original
   const file = currentFileState?.convertedFile || currentFileState?.file || null;
@@ -41,7 +41,6 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
   const [footnotePanelWidth, setFootnotePanelWidth] = useState(320);
   const [isResizingFootnote, setIsResizingFootnote] = useState(false);
   const resizeRef = useRef({ startX: 0, startWidth: 0 });
-  const [showConvertPopup, setShowConvertPopup] = useState(false);
 
   // Page Navigation State
   const [currentPage, setCurrentPage] = useState(1);
@@ -383,44 +382,7 @@ export const Editor: React.FC<EditorProps> = ({ state, files, currentIndex, onSe
               </button>
             )}
 
-            {/* Mobile Convert Button & Popup */}
-            {onConvertFile && currentFileState && currentFileState.status !== 'converted' && (
-              <div className="relative md:hidden">
-                <button
-                  onClick={() => setShowConvertPopup(!showConvertPopup)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded shadow-sm bg-primary hover:bg-blue-600 text-white text-sm font-medium transition-all duration-200"
-                  title="Convert File"
-                >
-                  <span className="material-icons-outlined text-sm">transform</span>
-                  <span>Convert</span>
-                </button>
-                {/* Convert Popup */}
-                {showConvertPopup && (
-                  <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-2 z-50 animate-fadeIn">
-                    <button
-                      onClick={() => {
-                        onConvertFile(currentIndex);
-                        setShowConvertPopup(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
-                    >
-                      <span className="material-icons-outlined text-lg">text_fields</span>
-                      Unicode to Bijoy
-                    </button>
-                    <button
-                      onClick={() => {
-                        onConvertFile(currentIndex);
-                        setShowConvertPopup(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
-                    >
-                      <span className="material-icons-outlined text-lg">format_shapes</span>
-                      Bijoy to Unicode
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+
           </div>
 
           {/* File Navigation */}
