@@ -485,12 +485,29 @@ export function convertXmlDocument(
         // 4. Fallback (forceConvert) -> Convert only if no explicit font was specified.
         let shouldConvertRecord = isSutonny;
 
-        // If a non-Sutonny font is explicitly specified, NEVER convert (even with Force Convert)
-        if (hasExplicitNonSutonnyFont) {
+        // If Sutonny is detected, ALWAYS convert regardless of other flags
+        if (isSutonny) {
+            //console.log(`  Decision: Converting - Sutonny font detected`);
+            shouldConvertRecord = true;
+        }
+        // If NOT Sutonny but a known English/Unicode font, NEVER convert
+        else if (isKnownEnglish) {
+            //console.log(`  Decision: NOT converting - known English/Unicode font`);
             shouldConvertRecord = false;
         }
-        // Only apply Force Convert when no explicit font is specified (unknown font)
-        else if (!isSutonny && !isKnownEnglish && forceConvert) {
+        // If NOT Sutonny, NOT English, but has an explicit non-Sutonny font
+        else if (hasExplicitNonSutonnyFont) {
+            if (forceConvert) {
+                //console.log(`  Decision: Force Converting - overriding explicit non-Sutonny font`);
+                shouldConvertRecord = true;
+            } else {
+                //console.log(`  Decision: NOT converting - explicit non-Sutonny font specified`);
+                shouldConvertRecord = false;
+            }
+        }
+        // No font info at all + force convert
+        else if (forceConvert) {
+            console.log(`  Decision: Converting - Force Convert enabled for unknown font`);
             shouldConvertRecord = true;
         }
 
