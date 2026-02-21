@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { FileState } from '../types';
 import JSZip from 'jszip';
-import { convertXmlDocument, extractFontStyleMap } from '../convert/bijoytounicode';
+import { convertXmlDocument } from '../convert/bijoytounicode';
 import { convertXmlDocumentToBijoy } from '../convert/unicodetobijoy';
 
 interface FileSidebarProps {
@@ -56,20 +56,6 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
         path.startsWith('word/') && path.endsWith('.xml')
       );
 
-      // --- MS Office 2007 Fix: Pre-build font style map from styles.xml ---
-      // This allows detecting fonts inherited from styles (not explicitly set per-run).
-      let fontStyleMap: Record<string, string> = {};
-      if (conversionType === 'legacyToUnicode') {
-        const stylesPath = xmlFiles.find(p => p.endsWith('styles.xml'));
-        if (stylesPath) {
-          const stylesFile = content.file(stylesPath);
-          if (stylesFile) {
-            const stylesXmlText = await stylesFile.async('string');
-            fontStyleMap = extractFontStyleMap(stylesXmlText);
-          }
-        }
-      }
-
       for (const path of xmlFiles) {
         const xmlFile = content.file(path);
         if (xmlFile) {
@@ -77,8 +63,8 @@ export const FileSidebar: React.FC<FileSidebarProps> = ({
           let convertedXml: string;
 
           if (conversionType === 'legacyToUnicode') {
-            const isStyleFile = path.endsWith('styles.xml');
-            convertedXml = convertXmlDocument(xmlText, isStyleFile, forceConvert, fontStyleMap);
+            const isStyleFile = path.includes('styles.xml');
+            convertedXml = convertXmlDocument(xmlText, isStyleFile, forceConvert);
           } else {
             convertedXml = convertXmlDocumentToBijoy(xmlText);
           }
